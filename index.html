@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monitoreo de campo</title>
+<meta name="theme-color" content="#1E5A38">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Monitoreo">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch.png">
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<script src="vendor/leaflet.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --paper:#F6F7F2; --card:#FFFFFF; --ink:#15221A; --mute:#566358; --line:#C9D1C2;
+  --field:#1E5A38; --field-d:#14402A; --sun:#F4C21F; --alert:#B8372A; --ok:#2E7D4F; --warn:#C98A00;
+  --head:'Barlow Semi Condensed','Barlow',system-ui,sans-serif;
+  --body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:500 18px/1.35 var(--body)}
+body{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;background:var(--field);color:#fff}
+header h1{margin:0;font:700 24px/1 var(--head);letter-spacing:.2px}
+.estado{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 12px;border:2px solid rgba(255,255,255,.55);
+  border-radius:999px;background:transparent;color:#fff;font:600 15px var(--body)}
+.estado .dot{width:12px;height:12px;border-radius:50%;background:var(--sun)}
+.estado.ok .dot{background:#7CE0A0}
+.estado.pend .dot{background:var(--sun)}
+.estado.off .dot{background:#FF8A7A}
+
+main{padding:14px 14px 0;max-width:640px;margin:0 auto}
+.card{background:var(--card);border:2px solid var(--ink);border-radius:10px;padding:14px;margin-bottom:14px}
+h2{margin:18px 2px 8px;font:700 22px/1.1 var(--head)}
+.card h2{margin:0 0 10px}
+label,.lbl{display:block;margin:12px 0 6px;font-weight:600;font-size:16px;color:var(--mute)}
+.card>label:first-child,.grid2>div>label:first-child{margin-top:0}
+
+input,select,textarea{width:100%;min-height:52px;padding:10px 12px;border:2px solid var(--ink);border-radius:8px;
+  background:#fff;color:var(--ink);font:500 19px var(--body)}
+textarea{min-height:84px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:4px solid var(--sun);outline-offset:1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+button{font-family:var(--body);cursor:pointer}
+.btn{min-height:52px;padding:10px 16px;border:2px solid var(--ink);border-radius:8px;background:#fff;color:var(--ink);font-weight:600;font-size:18px}
+.btn:active{background:var(--line)}
+.btn-main{width:100%;min-height:62px;margin-top:16px;border:2px solid var(--ink);border-radius:10px;background:var(--sun);
+  color:var(--ink);font:700 24px var(--head);letter-spacing:.2px}
+.btn-main:active{transform:translateY(1px);background:#E3B213}
+.btn-link{border:0;background:none;color:var(--field);font-weight:600;font-size:16px;text-decoration:underline;min-height:44px}
+
+.seg{display:flex;border:2px solid var(--ink);border-radius:8px;overflow:hidden}
+.seg button{flex:1;min-height:52px;padding:6px 4px;border:0;border-right:2px solid var(--ink);background:#fff;color:var(--ink);font-weight:600;font-size:17px}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--field);color:#fff}
+
+.gps-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.gpsinfo{margin-top:8px;font-weight:600;font-size:16px;color:var(--mute)}
+.gpsinfo.bien{color:var(--ok)} .gpsinfo.medio{color:var(--warn)} .gpsinfo.mal{color:var(--alert)}
+
+.stepper{display:grid;grid-template-columns:60px 1fr 60px;gap:8px;align-items:stretch}
+.stepper button{min-height:60px;border:2px solid var(--ink);border-radius:8px;background:#fff;color:var(--ink);font:700 32px var(--head)}
+.stepper button:active{background:var(--line)}
+.stepper input{text-align:center;font:700 28px var(--head);min-height:60px}
+
+.inc{display:flex;align-items:baseline;gap:6px;margin-top:14px}
+.inc b{font:700 68px/1 var(--head);color:var(--alert)}
+.inc span{font:600 22px var(--head);color:var(--mute)}
+.tally{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.tally i{display:block;width:20px;height:26px;border:2px solid var(--ink);border-radius:3px 3px 8px 8px;background:#fff}
+.tally i.on{background:var(--alert);border-color:var(--alert)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:4px 6px 4px 14px;border:2px solid var(--ink);border-radius:999px;background:#fff;font:700 20px var(--head)}
+.chip button{width:36px;height:36px;border:0;border-radius:50%;background:var(--line);color:var(--ink);font:700 20px var(--body)}
+
+.res{margin-top:14px;padding:12px 14px;border:2px solid var(--field);border-radius:10px;background:#EAF2EC}
+.res .big{font:700 58px/1 var(--head);color:var(--field-d)}
+.res .u{font:600 20px var(--head);color:var(--mute);margin-left:4px}
+.res .det{margin-top:6px;font-size:16px;color:var(--mute)}
+.res .aviso{margin-top:6px;font-weight:600;font-size:16px;color:var(--alert)}
+
+.foto{display:flex;align-items:center;gap:12px;margin-top:10px}
+.foto img{width:84px;height:84px;object-fit:cover;border:2px solid var(--ink);border-radius:8px}
+
+.fila{margin-bottom:10px;padding:12px 14px;border:2px solid var(--ink);border-radius:10px;background:#fff}
+.fila.pend{border-style:dashed;background:#FFF8DD}
+.fila-top{display:flex;gap:8px;align-items:baseline}
+.fila-top b{font:700 22px var(--head)}
+.fila-top span{color:var(--mute);font-size:16px}
+.fila-top time{margin-left:auto;color:var(--mute);font-size:15px}
+.fila .dato{font-weight:600}
+.fila a{display:inline-block;margin-top:4px;color:var(--field);font-weight:600}
+.vacio{margin:6px 2px;color:var(--mute)}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:2px solid var(--ink);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{min-height:68px;padding:0 2px;border:0;border-right:2px solid var(--ink);background:#fff;color:var(--ink);font:700 17px var(--head)}
+.tabs button:last-child{border-right:0}
+.olote{display:grid;grid-template-columns:44px 1fr 110px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.olote input[type=checkbox]{width:30px;height:30px;min-height:0;margin:0 auto}
+.olote input[type=number]{min-height:44px;text-align:right}
+.oprod{border:2px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px}
+.oprod .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.oprod .tot{margin-top:6px;font-weight:700;color:var(--field)}
+.oprod .quitar{border:0;background:none;color:var(--alert);font-weight:700;font-size:16px;min-height:40px}
+.otot{font:700 20px var(--head);margin-top:10px}
+.pdflink{display:inline-block;margin-top:4px;font-weight:700}
+.tabs button.on{background:var(--field);color:#fff}
+
+#toast{position:fixed;left:14px;right:14px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9;padding:14px 16px;border:2px solid var(--ink);
+  border-radius:10px;background:var(--ink);color:#fff;font-weight:600;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+#toast.err{background:var(--alert);border-color:var(--alert)}
+.map{height:300px;margin-top:10px;border:2px solid var(--ink);border-radius:8px;background:var(--line)}
+.lotebadge{margin-top:10px;padding:10px 12px;border:2px solid var(--field);border-radius:8px;background:#EAF2EC;font-weight:600}
+.lotebadge.fuera{border-color:var(--warn);background:#FFF5DB}
+.ndvi{margin-top:10px;padding:10px 12px;border:2px solid var(--ink);border-radius:8px;background:#fff}
+.ndvi .top{display:flex;align-items:center;gap:10px}
+.ndvi .top label{display:flex;align-items:center;gap:8px;margin:0;color:var(--ink);font-size:18px}
+.ndvi .top input[type=checkbox]{width:26px;height:26px;min-height:0}
+.ndvi select{flex:1;min-height:46px;font-size:17px}
+.ndvi input[type=range]{min-height:36px;padding:0;border:0}
+body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
+#setup{padding:14px;max-width:640px;margin:0 auto}
+#setupMsg{margin:0 0 6px}
+.cfgdato{margin:0 0 6px}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Monitoreo de campo</h1>
+  <button class="estado ok" id="estado" onclick="sincronizar(true)" aria-live="polite">
+    <span class="dot"></span><span id="estadoTxt">Todo enviado</span>
+  </button>
+</header>
+
+<section id="setup" hidden>
+  <div class="card">
+    <h2>Configurar este celular</h2>
+    <p id="setupMsg">Cargá tu nombre y la clave de equipo. Se hace una sola vez y necesita señal.</p>
+    <label for="cfgNombre">Tu nombre</label><input id="cfgNombre" autocomplete="name">
+    <label for="cfgClave">Clave de equipo</label><input id="cfgClave" type="password" autocomplete="off">
+    <button class="btn-main" id="btnCfg" onclick="configurar()">Entrar</button>
+    <button class="btn-link" id="btnCfgCancelar" hidden onclick="cerrarSetup()">Cancelar</button>
+  </div>
+</section>
+
+<main>
+  <div id="ctxwrap">
+    <section class="card" aria-label="Dónde estás">
+      <div class="grid2">
+        <div><label for="campania">Campaña</label><input id="campania" autocomplete="off"></div>
+        <div><label for="cultivo">Cultivo</label><select id="cultivo"></select></div>
+      </div>
+      <div class="grid2" style="margin-top:12px">
+        <div><label for="fecha">Fecha</label><input id="fecha" type="date"></div>
+        <div><label for="hora">Hora</label><input id="hora" type="time"></div>
+      </div>
+      <button class="btn-link" id="btnAhora" hidden onclick="ponerAhora()">Usar fecha y hora de ahora</button>
+      <label for="campo">Campo</label><select id="campo"></select>
+      <div id="loteWrap"><label for="lote">Lote</label><select id="lote"></select></div>
+    </section>
+
+    <section class="card" id="gpsCard" aria-label="Ubicación del punto">
+      <h2>Ubicación del punto</h2>
+      <button class="btn" id="btnGps" style="width:100%" onclick="tomarGPS()">Tomar punto GPS</button>
+      <div class="gps-row">
+        <div><label for="lat">Latitud</label><input id="lat" inputmode="decimal" placeholder="-25.1234"></div>
+        <div><label for="lng">Longitud</label><input id="lng" inputmode="decimal" placeholder="-64.1234"></div>
+      </div>
+      <div class="gpsinfo" id="gpsInfo">Todavía sin ubicación</div>
+      <div class="lotebadge" id="loteBadge" hidden></div>
+      <button class="btn-link" id="btnMapa" onclick="toggleMapa()">Ver mapa de lotes</button>
+      <div id="map" class="map" hidden></div>
+      <div id="ndviBar" class="ndvi" hidden>
+        <div class="top">
+          <label><input type="checkbox" id="ndviOn" onchange="toggleNdvi()"> Ver NDVI</label>
+          <select id="ndviSel" onchange="cambiarNdvi()" aria-label="Fecha de la imagen"></select>
+        </div>
+        <label for="ndviOp" style="margin-top:8px">Transparencia</label>
+        <input id="ndviOp" type="range" min="0.2" max="1" step="0.05" value="0.75" oninput="opacidadNdvi()">
+        <div class="gpsinfo" id="ndviInfo"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MONITOREO -->
+  <div id="tab-mon" class="tab">
+    <section class="card">
+      <h2>Qué observás</h2>
+      <div class="seg" id="segTipo">
+        <button data-v="Plaga" class="on" onclick="setTipo('Plaga')">Plaga</button>
+        <button data-v="Enfermedad" onclick="setTipo('Enfermedad')">Enfermedad</button>
+        <button data-v="Maleza" onclick="setTipo('Maleza')">Maleza</button>
+      </div>
+      <label for="problema">Cuál</label>
+      <select id="problema" onchange="onProblema()"></select>
+      <div id="otroWrap" hidden><label for="otro">Nombre</label><input id="otro" autocomplete="off"></div>
+      <label for="estadio">Estadio del cultivo (ej. V3, R2)</label>
+      <input id="estadio" autocomplete="off">
+    </section>
+
+    <section class="card">
+      <h2>Incidencia</h2>
+      <div class="lbl" style="margin-top:0">Plantas evaluadas</div>
+      <div class="stepper">
+        <button onclick="setNum('ev', m.ev-1)" aria-label="Una menos">−</button>
+        <input id="ev" type="number" inputmode="numeric" min="1" onchange="setNum('ev', this.value)">
+        <button onclick="setNum('ev', m.ev+1)" aria-label="Una más">+</button>
+      </div>
+      <div class="lbl">Plantas afectadas</div>
+      <div class="stepper">
+        <button onclick="setNum('af', m.af-1)" aria-label="Una menos">−</button>
+        <input id="af" type="number" inputmode="numeric" min="0" onchange="setNum('af', this.value)">
+        <button onclick="setNum('af', m.af+1)" aria-label="Una más">+</button>
+      </div>
+      <div class="inc"><b id="inc">0</b><span>% de incidencia</span></div>
+      <div class="tally" id="tally" aria-hidden="true"></div>
+
+      <div class="lbl">Severidad (opcional)</div>
+      <div class="seg" id="segSev">
+        <button data-v="Baja" onclick="setSev('Baja')">Baja</button>
+        <button data-v="Media" onclick="setSev('Media')">Media</button>
+        <button data-v="Alta" onclick="setSev('Alta')">Alta</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Observaciones y foto</h2>
+      <textarea id="obsMon" placeholder="Estado del lote, dónde se concentra, qué viste"></textarea>
+      <div class="foto">
+        <label class="btn" style="margin:0;display:inline-flex;align-items:center;color:var(--ink)">Sacar foto
+          <input id="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="onFoto(this)">
+        </label>
+        <div id="fotoWrap" hidden style="display:flex;align-items:center;gap:10px">
+          <img id="fotoPrev" alt="Foto del punto">
+          <button class="btn-link" onclick="quitarFoto()">Quitar</button>
+        </div>
+      </div>
+      <button class="btn-main" onclick="guardarMon()">Guardar punto</button>
+    </section>
+  </div>
+
+  <!-- CONTEO -->
+  <div id="tab-cont" class="tab" hidden>
+    <section class="card">
+      <h2>Conteo en surcos</h2>
+      <div class="seg" id="segMom">
+        <button data-v="Siembra" class="on" onclick="setMomento('Siembra')">Siembra</button>
+        <button data-v="Emergencia" onclick="setMomento('Emergencia')">Emergencia</button>
+      </div>
+      <div class="grid2" style="margin-top:12px">
+        <div><label for="surcos">Entre surcos (cm)</label><input id="surcos" type="number" inputmode="decimal"></div>
+        <div><label for="metros">Metros por muestra</label><input id="metros" type="number" inputmode="decimal"></div>
+      </div>
+      <label for="conteo" id="conteoLbl">Semillas contadas en la muestra</label>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+        <input id="conteo" type="number" inputmode="numeric" min="0">
+        <button class="btn" onclick="agregarMuestra()">Agregar muestra</button>
+      </div>
+      <div class="chips" id="chips"></div>
+
+      <div class="res" id="res">
+        <div><span class="big" id="resHa">0</span><span class="u" id="resUni">semillas/ha</span></div>
+        <div class="det" id="resDet">Agregá al menos una muestra para ver el resultado.</div>
+        <div class="aviso" id="resAviso" hidden></div>
+      </div>
+
+      <div id="logroWrap" hidden>
+        <label for="dens">Densidad sembrada (semillas/ha)</label>
+        <input id="dens" type="number" inputmode="numeric" oninput="pintarStand()">
+        <div class="res" style="margin-top:10px"><span class="big" id="logro" style="font-size:44px">—</span><span class="u">% de logro</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Observaciones</h2>
+      <textarea id="obsSt" placeholder="Humedad, calidad de siembra, fallas en la línea"></textarea>
+      <button class="btn-main" onclick="guardarStand()">Guardar conteo</button>
+    </section>
+  </div>
+
+  <!-- ORDEN DE APLICACIÓN -->
+  <div id="tab-ord" class="tab" hidden>
+    <section class="card" id="ordClave">
+      <h2>Órdenes de aplicación</h2>
+      <p id="ordClaveMsg" style="margin:0 0 10px">Ingresá la clave para crear órdenes.</p>
+      <input id="claveIn" type="password" autocomplete="off" placeholder="Clave">
+      <button class="btn-main" onclick="entrarClave()">Entrar</button>
+    </section>
+    <div id="ordForm" hidden>
+      <section class="card">
+        <h2>Lotes y hectáreas</h2>
+        <div id="ordLotes"></div>
+        <div class="otot" id="ordHasTot"></div>
+      </section>
+      <section class="card">
+        <h2>Máquina</h2>
+        <label for="ordMaq">Máquina y contratista</label><select id="ordMaq"></select>
+        <div class="grid2" style="margin-top:12px">
+          <div><label for="ordCaldo">Caldo (L/ha)</label><input id="ordCaldo" type="number" inputmode="decimal" min="0" oninput="pintarOrd()"></div>
+          <div><label>Caldo total</label><div class="otot" id="ordCaldoTot" style="margin-top:10px">-</div></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Productos</h2>
+        <div id="ordProds"></div>
+        <button class="btn" id="btnAddProd" style="width:100%" onclick="agregarProd()">Agregar producto</button>
+      </section>
+      <section class="card">
+        <label for="ordResp">Responsable</label><input id="ordResp" autocomplete="off">
+        <label for="ordObs">Observaciones</label><textarea id="ordObs" rows="3"></textarea>
+        <label style="display:flex;align-items:center;gap:10px;margin-top:14px;color:var(--ink)"><input type="checkbox" id="ordMapa" checked style="width:28px;min-height:0;height:28px;margin:0"> Incluir mapa de los lotes en el PDF</label>
+        <button class="btn-main" onclick="guardarOrden()">Generar orden y PDF</button>
+        <button class="btn-link" onclick="salirClave()">Cerrar sesión de órdenes</button>
+      </section>
+    </div>
+  </div>
+
+  <!-- REGISTROS -->
+  <div id="tab-reg" class="tab" hidden>
+    <div id="listaReg"></div>
+    <button class="btn" style="width:100%" onclick="actualizarTodo(true)">Actualizar lista</button>
+    <section class="card" style="margin-top:14px">
+      <h2>Este celular</h2>
+      <p class="cfgdato" id="cfgUsuario"></p>
+      <p class="cfgdato" id="cfgOffline"></p>
+      <button class="btn" id="btnInstalar" style="width:100%" hidden onclick="instalarApp()">Instalar app</button>
+      <button class="btn-link" onclick="abrirSetup()">Cambiar nombre o clave</button>
+    </section>
+  </div>
+</main>
+
+<nav class="tabs" aria-label="Secciones">
+  <button id="t-mon" class="on" onclick="tab('mon')">Monitoreo</button>
+  <button id="t-cont" onclick="tab('cont')">Conteo</button>
+  <button id="t-ord" onclick="tab('ord')">Orden</button>
+  <button id="t-reg" onclick="tab('reg')">Registros</button>
+</nav>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const LS = { ctx:'mc_ctx', cfg:'mc_cfg', clave:'mc_clave', resp:'mc_resp', equipo:'mc_equipo' };
+const lee = (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } };
+const escribe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt0 = n => Math.round(Number(n) || 0).toLocaleString('es-AR');
+const fmt1 = n => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString('es-AR');
+
+let datos = { lotes: [], catalogo: {}, productos: [], maquinas: [] };
+let equipo = lee(LS.equipo, null);
+let ctx = lee(LS.ctx, {});
+let cfg = lee(LS.cfg, { surcos: 52, metros: 5 });
+let pos = null;
+let recientes = [];
+let sincronizando = false;
+let cola = [];
+let guardando = false;
+let ultimaActualizacion = 0;
+let promptInstalar = null;
+const m = { tipo:'Plaga', ev:10, af:0, sev:'', foto:'' };
+const st = { momento:'Siembra', muestras:[] };
+
+/* ---------- base de datos del celular (IndexedDB) ---------- */
+let dbp = null;
+function db() {
+  if (!dbp) dbp = new Promise((res, rej) => {
+    const q = indexedDB.open('monitoreo', 1);
+    q.onupgradeneeded = () => {
+      q.result.createObjectStore('cola', { keyPath: 'id' });
+      q.result.createObjectStore('kv');
+    };
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+  return dbp;
+}
+async function dbTx(store, modo, fn) {
+  const d = await db();
+  return new Promise((res, rej) => {
+    const tx = d.transaction(store, modo);
+    const q = fn(tx.objectStore(store));
+    tx.oncomplete = () => res(q ? q.result : undefined);
+    tx.onerror = tx.onabort = () => rej(tx.error);
+  });
+}
+const dbGet = k => dbTx('kv', 'readonly', s => s.get(k));
+const dbSet = (k, v) => dbTx('kv', 'readwrite', s => s.put(v, k));
+const dbDel = k => dbTx('kv', 'readwrite', s => s.delete(k));
+const dbKeys = () => dbTx('kv', 'readonly', s => s.getAllKeys());
+
+/* ---------- conexión con Apps Script ---------- */
+const apiLista = () => typeof API_URL === 'string' && /^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL);
+async function api(accion, datosPedido, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms || 60000);
+  try {
+    // text/plain es a propósito: es el formato que Apps Script acepta desde otra página
+    const res = await fetch(API_URL, { method: 'POST', redirect: 'follow', signal: ctrl.signal,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ accion: accion, clave: equipo ? equipo.clave : '', datos: datosPedido || {} }) });
+    if (!res.ok) throw new Error('El servidor respondió ' + res.status);
+    const j = await res.json();
+    if (!j.ok) { const e = new Error(j.error || 'Error del servidor'); e.codigo = j.codigo; throw e; }
+    return j.datos;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Se agotó el tiempo de espera');
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+function claveRechazada(e) {
+  if (!e || e.codigo !== 'clave') return false;
+  abrirSetup('La clave de equipo cambió. Cargá la nueva: tus registros sin enviar siguen guardados.');
+  return true;
+}
+
+/* ---------- configuración del celular ---------- */
+function abrirSetup(msg) {
+  $('setup').hidden = false;
+  document.body.classList.add('sinconfig');
+  $('setupMsg').textContent = msg || (apiLista() ? 'Cargá tu nombre y la clave de equipo. Se hace una sola vez y necesita señal.' : 'Falta pegar la URL de Apps Script en el archivo config.js.');
+  $('cfgNombre').value = equipo ? equipo.nombre : '';
+  $('cfgClave').value = equipo ? equipo.clave : '';
+  $('btnCfg').disabled = !apiLista();
+  $('btnCfgCancelar').hidden = !equipo;
+  window.scrollTo(0, 0);
+}
+function cerrarSetup() {
+  $('setup').hidden = true;
+  document.body.classList.remove('sinconfig');
+  pintarCfg();
+}
+async function configurar() {
+  const nombre = $('cfgNombre').value.trim(), clave = $('cfgClave').value.trim();
+  if (!nombre) return toast('Escribí tu nombre', true);
+  if (!clave) return toast('Escribí la clave de equipo', true);
+  const previo = equipo;
+  if (!previo || previo.clave !== clave) {
+    if (!navigator.onLine) return toast('Sin señal para verificar la clave', true);
+    equipo = { nombre: nombre, clave: clave };
+    try {
+      await api('ping');
+    } catch (e) {
+      equipo = previo;
+      return toast(e.codigo === 'clave' ? 'Clave de equipo incorrecta' : 'No se pudo conectar: ' + e.message, true);
+    }
+  }
+  equipo = { nombre: nombre, clave: clave };
+  escribe(LS.equipo, equipo);
+  cerrarSetup();
+  toast('Listo, ' + nombre);
+  sincronizar();
+  actualizarTodo(false, true);
+}
+async function pintarCfg() {
+  $('cfgUsuario').textContent = equipo ? 'Usuario: ' + equipo.nombre : '';
+  let listo = false;
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      listo = !!(reg && reg.active && datos.lotes.length);
+    }
+  } catch (e) { /* sin acceso */ }
+  $('cfgOffline').textContent = listo ? 'Lista para abrir sin señal.' : 'Todavía no está lista para abrir sin señal. Abrila una vez con señal.';
+}
+async function instalarApp() {
+  if (!promptInstalar) return;
+  promptInstalar.prompt();
+  await promptInstalar.userChoice;
+  promptInstalar = null;
+  $('btnInstalar').hidden = true;
+}
+
+/* ---------- borrador: lo que estás cargando sobrevive si la app se recarga ---------- */
+let borradorT = null;
+function programarBorrador() {
+  clearTimeout(borradorT);
+  borradorT = setTimeout(guardarBorrador, 300);
+}
+function leerBorrador() {
+  const tabAct = ['mon', 'cont', 'ord', 'reg'].find(k => !$('tab-' + k).hidden);
+  return { tab: tabAct, tipo: m.tipo, ev: m.ev, af: m.af, sev: m.sev, foto: m.foto,
+    problema: $('problema').value, otro: $('otro').value, estadio: $('estadio').value, obsMon: $('obsMon').value,
+    momento: st.momento, muestras: st.muestras, conteo: $('conteo').value, dens: $('dens').value, obsSt: $('obsSt').value,
+    ord: { lotes: ordLotes, campo: ordCampo, prods: ordProds, maq: $('ordMaq').value, caldo: $('ordCaldo').value,
+           resp: $('ordResp').value, obs: $('ordObs').value, mapa: $('ordMapa').checked } };
+}
+function guardarBorrador() {
+  clearTimeout(borradorT);
+  return dbSet('borrador', leerBorrador()).catch(() => {});
+}
+async function restaurarBorrador() {
+  let b = null;
+  try { b = await dbGet('borrador'); } catch (e) { /* sin borrador */ }
+  if (!b) return;
+  m.tipo = b.tipo; m.ev = b.ev; m.af = b.af; m.foto = b.foto || '';
+  setTipo(b.tipo);
+  m.sev = '';
+  if (b.sev) setSev(b.sev);
+  if ([...$('problema').options].some(o => o.value === b.problema)) $('problema').value = b.problema;
+  onProblema();
+  $('otro').value = b.otro || ''; $('estadio').value = b.estadio || ''; $('obsMon').value = b.obsMon || '';
+  if (m.foto) { $('fotoPrev').src = m.foto; $('fotoWrap').hidden = false; }
+  st.muestras = b.muestras || [];
+  setMomento(b.momento || 'Siembra');
+  $('conteo').value = b.conteo || ''; $('dens').value = b.dens || ''; $('obsSt').value = b.obsSt || '';
+  if (b.ord) {
+    ordLotes = b.ord.lotes || {}; ordCampo = b.ord.campo || ''; ordProds = b.ord.prods || [];
+    $('ordCaldo').value = b.ord.caldo || ''; $('ordResp').value = b.ord.resp || ''; $('ordObs').value = b.ord.obs || '';
+    $('ordMapa').checked = b.ord.mapa !== false;
+    borradorMaq = b.ord.maq || '';
+  }
+  pintarInc(); pintarStand();
+  if (b.tab) tab(b.tab);
+}
+const unaVez = fn => async () => {
+  if (guardando) return;
+  guardando = true;
+  try { await fn(); } finally { guardando = false; }
+};
+
+/* ---------- utilidades ---------- */
+function toast(txt, error) {
+  const t = $('toast');
+  t.textContent = txt;
+  t.className = 'show' + (error ? ' err' : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.className = ''; }, error ? 4500 : 2200);
+}
+function nuevoId() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+let cuandoManual = false;
+function ponerAhora() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  $('fecha').value = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  $('hora').value = p(d.getHours()) + ':' + p(d.getMinutes());
+  cuandoManual = false;
+  $('btnAhora').hidden = true;
+}
+function cuando() {
+  if (!$('fecha').value || !$('hora').value) ponerAhora();
+  return { fecha: $('fecha').value, hora: $('hora').value };
+}
+function campaniaActual() {
+  const d = new Date(), y = d.getFullYear(), a = d.getMonth() >= 6 ? y : y - 1;
+  return a + '/' + String(a + 1).slice(2);
+}
+
+/* ---------- contexto: campaña, campo, lote, cultivo ---------- */
+function poblarCtx() {
+  $('campania').value = ctx.campania || campaniaActual();
+  const campos = [...new Set(datos.lotes.map(l => l.campo))];
+  $('campo').innerHTML = campos.length ? campos.map(c => '<option>' + esc(c) + '</option>').join('') : '<option value="">Sin lotes cargados</option>';
+  if (ctx.campo && campos.includes(ctx.campo)) $('campo').value = ctx.campo;
+  poblarLotes();
+  const cultivos = datos.catalogo.Cultivo && datos.catalogo.Cultivo.length ? datos.catalogo.Cultivo : ['Poroto', 'Soja', 'Maíz', 'Algodón', 'Sésamo'];
+  $('cultivo').innerHTML = cultivos.map(c => '<option>' + esc(c) + '</option>').join('');
+  if (ctx.cultivo && cultivos.includes(ctx.cultivo)) $('cultivo').value = ctx.cultivo;
+  poblarProblemas();
+}
+function poblarLotes() {
+  const lotes = datos.lotes.filter(l => l.campo === $('campo').value);
+  $('lote').innerHTML = lotes.map(l => '<option>' + esc(l.lote) + '</option>').join('');
+  if (ctx.lote && lotes.some(l => l.lote === ctx.lote)) $('lote').value = ctx.lote;
+}
+function guardarCtx() {
+  ctx = { campania: $('campania').value.trim(), campo: $('campo').value, lote: $('lote').value, cultivo: $('cultivo').value };
+  escribe(LS.ctx, ctx);
+  pintarMapa();
+}
+
+/* ---------- GPS ---------- */
+function tomarGPS() {
+  if (!navigator.geolocation) { $('gpsInfo').textContent = 'Este navegador no tiene GPS. Escribí las coordenadas.'; $('gpsInfo').className = 'gpsinfo mal'; return; }
+  $('gpsInfo').textContent = 'Buscando señal GPS…';
+  $('gpsInfo').className = 'gpsinfo';
+  navigator.geolocation.getCurrentPosition(p => {
+    pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+    pintarPos();
+  }, err => {
+    const msg = err.code === 1 ? 'Permiso de ubicación denegado' : err.code === 3 ? 'Se agotó el tiempo sin señal' : 'No hay señal GPS';
+    $('gpsInfo').textContent = msg + '. Probá de nuevo o escribí las coordenadas.';
+    $('gpsInfo').className = 'gpsinfo mal';
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+function pintarPos() {
+  pintarPosBase();
+  if (pos) { detectarLote(); pintarMapa(); }
+}
+function pintarPosBase() {
+  const info = $('gpsInfo');
+  if (!pos) { $('lat').value = ''; $('lng').value = ''; info.textContent = 'Todavía sin ubicación'; info.className = 'gpsinfo'; return; }
+  $('lat').value = pos.lat.toFixed(6);
+  $('lng').value = pos.lng.toFixed(6);
+  if (pos.acc == null) { info.textContent = 'Coordenadas escritas a mano'; info.className = 'gpsinfo'; return; }
+  const a = Math.round(pos.acc);
+  info.textContent = 'Precisión de ' + a + ' m';
+  info.className = 'gpsinfo ' + (a <= 10 ? 'bien' : a <= 25 ? 'medio' : 'mal');
+}
+function coordManual() {
+  const la = parseFloat($('lat').value.replace(',', '.')), lo = parseFloat($('lng').value.replace(',', '.'));
+  if (isFinite(la) && isFinite(lo)) { pos = { lat: la, lng: lo, acc: null }; $('gpsInfo').textContent = 'Coordenadas escritas a mano'; $('gpsInfo').className = 'gpsinfo'; detectarLote(); pintarMapa(); }
+  else pos = null;
+}
+
+/* ---------- monitoreo ---------- */
+function poblarProblemas() {
+  const lista = datos.catalogo[m.tipo] || [];
+  const prev = $('problema').options.length > 1 ? $('problema').value : '';
+  $('problema').innerHTML = lista.map(p => '<option>' + esc(p) + '</option>').join('') + '<option value="__otro">Otro (escribir)</option>';
+  if ([...$('problema').options].some(o => o.value === prev)) $('problema').value = prev;
+  onProblema();
+}
+function onProblema() { $('otroWrap').hidden = $('problema').value !== '__otro'; }
+function setTipo(t) {
+  m.tipo = t;
+  document.querySelectorAll('#segTipo button').forEach(b => b.classList.toggle('on', b.dataset.v === t));
+  poblarProblemas();
+}
+function setSev(v) {
+  m.sev = m.sev === v ? '' : v;
+  document.querySelectorAll('#segSev button').forEach(b => b.classList.toggle('on', b.dataset.v === m.sev));
+}
+function setNum(k, v) {
+  v = Math.max(0, Math.floor(Number(v) || 0));
+  if (k === 'ev') { m.ev = Math.max(1, v); if (m.af > m.ev) m.af = m.ev; }
+  else m.af = Math.min(v, m.ev);
+  pintarInc();
+}
+function pintarInc() {
+  $('ev').value = m.ev;
+  $('af').value = m.af;
+  $('inc').textContent = fmt1(m.af / m.ev * 100);
+  const t = $('tally');
+  if (m.ev <= 30) {
+    let h = '';
+    for (let i = 0; i < m.ev; i++) h += '<i class="' + (i < m.af ? 'on' : '') + '"></i>';
+    t.innerHTML = h; t.hidden = false;
+  } else t.hidden = true;
+}
+async function onFoto(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  try { m.foto = await comprimir(f); $('fotoPrev').src = m.foto; $('fotoWrap').hidden = false; programarBorrador(); }
+  catch (e) { toast('No se pudo leer la foto', true); }
+  inp.value = '';
+}
+function quitarFoto() { m.foto = ''; $('fotoWrap').hidden = true; programarBorrador(); }
+function comprimir(file) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', 0.65));
+    };
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+function base() {
+  return { usuario: equipo ? equipo.nombre : '', campania: ctx.campania, campo: ctx.campo, lote: ctx.lote, cultivo: ctx.cultivo,
+           lat: pos ? pos.lat : '', lng: pos ? pos.lng : '', acc: pos && pos.acc != null ? Math.round(pos.acc) : '' };
+}
+const guardarMon = unaVez(async () => {
+  guardarCtx();
+  if (!ctx.lote) return toast('Elegí el lote', true);
+  let problema = $('problema').value;
+  if (problema === '__otro') problema = $('otro').value.trim();
+  if (!problema) return toast('Indicá qué observaste', true);
+  if (!pos && !confirm('No hay ubicación del punto. ¿Guardar igual?')) return;
+  const r = Object.assign({ id: nuevoId(), tabla: 'mon' }, cuando(), base(), {
+    estadio: $('estadio').value.trim(), tipo: m.tipo, problema: problema,
+    evaluadas: m.ev, afectadas: m.af, incidencia: Math.round(m.af / m.ev * 1000) / 10,
+    severidad: m.sev, obs: $('obsMon').value.trim(), foto: m.foto });
+  if (await encolar(r)) {
+    toast('Punto guardado en ' + ctx.lote);
+    ponerAhora();
+    m.af = 0; m.sev = ''; m.foto = '';
+    document.querySelectorAll('#segSev button').forEach(b => b.classList.remove('on'));
+    $('obsMon').value = ''; $('otro').value = ''; $('fotoWrap').hidden = true;
+    pintarInc();
+    pos = null; pintarPos(); tomarGPS();
+    await guardarBorrador();
+  }
+});
+
+/* ---------- conteo (siembra y emergencia) ---------- */
+function setMomento(v) {
+  st.momento = v;
+  document.querySelectorAll('#segMom button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  pintarStand();
+}
+function agregarMuestra() {
+  const v = parseFloat($('conteo').value);
+  if (!isFinite(v) || v < 0) return toast('Escribí el conteo de la muestra', true);
+  st.muestras.push(v);
+  $('conteo').value = '';
+  pintarStand();
+  $('conteo').focus();
+}
+function quitarMuestra(i) { st.muestras.splice(i, 1); pintarStand(); }
+function calcStand() {
+  const n = st.muestras.length, surcos = parseFloat($('surcos').value), metros = parseFloat($('metros').value);
+  if (!n || !(surcos > 0) || !(metros > 0)) return null;
+  const prom = st.muestras.reduce((a, b) => a + b, 0) / n;
+  const porMetro = prom / metros;
+  const ha = porMetro / (surcos / 100) * 10000;
+  let cv = '';
+  if (n > 1 && prom > 0) {
+    const v = st.muestras.reduce((a, b) => a + (b - prom) * (b - prom), 0) / (n - 1);
+    cv = Math.sqrt(v) / prom * 100;
+  }
+  return { n: n, prom: prom, porMetro: porMetro, ha: ha, cv: cv };
+}
+function pintarStand() {
+  const siembra = st.momento === 'Siembra';
+  $('conteoLbl').textContent = siembra ? 'Semillas contadas en la muestra' : 'Plantas contadas en la muestra';
+  $('resUni').textContent = siembra ? 'semillas/ha' : 'plantas/ha';
+  $('logroWrap').hidden = siembra;
+  $('chips').innerHTML = st.muestras.map((v, i) =>
+    '<span class="chip">' + fmt1(v) + '<button onclick="quitarMuestra(' + i + ')" aria-label="Quitar muestra ' + (i + 1) + '">×</button></span>').join('');
+  const c = calcStand();
+  const aviso = $('resAviso');
+  aviso.hidden = true;
+  if (!c) {
+    $('resHa').textContent = '0';
+    $('resDet').textContent = st.muestras.length ? 'Completá la distancia entre surcos y los metros por muestra.' : 'Agregá al menos una muestra para ver el resultado.';
+  } else {
+    $('resHa').textContent = fmt0(c.ha);
+    $('resDet').textContent = fmt1(c.porMetro) + ' por metro lineal, ' + c.n + (c.n === 1 ? ' muestra' : ' muestras') + (c.cv !== '' ? ', variación de ' + fmt1(c.cv) + '%' : '');
+    if (c.cv !== '' && c.cv > 25) { aviso.textContent = 'La variación entre muestras es alta. Conviene sumar más muestras.'; aviso.hidden = false; }
+  }
+  const dens = parseFloat($('dens').value);
+  $('logro').textContent = (!siembra && c && dens > 0) ? fmt1(c.ha / dens * 100) : '—';
+}
+const guardarStand = unaVez(async () => {
+  guardarCtx();
+  if (!ctx.lote) return toast('Elegí el lote', true);
+  const c = calcStand();
+  if (!c) return toast('Faltan muestras o medidas', true);
+  if (!pos && !confirm('No hay ubicación del punto. ¿Guardar igual?')) return;
+  const siembra = st.momento === 'Siembra';
+  const dens = parseFloat($('dens').value);
+  const r = Object.assign({ id: nuevoId(), tabla: 'stand' }, cuando(), base(), {
+    momento: st.momento, surcos: parseFloat($('surcos').value), metros: parseFloat($('metros').value),
+    n: c.n, conteos: st.muestras.slice(), porMetro: Math.round(c.porMetro * 100) / 100,
+    ha: Math.round(c.ha), cv: c.cv === '' ? '' : Math.round(c.cv * 10) / 10,
+    densidad: (!siembra && dens > 0) ? dens : '',
+    logro: (!siembra && dens > 0) ? Math.round(c.ha / dens * 1000) / 10 : '',
+    obs: $('obsSt').value.trim() });
+  if (await encolar(r)) {
+    toast('Conteo guardado en ' + ctx.lote);
+    ponerAhora();
+    st.muestras = []; $('obsSt').value = '';
+    pintarStand();
+    pos = null; pintarPos(); tomarGPS();
+    await guardarBorrador();
+  }
+});
+
+/* ---------- cola sin conexión y sincronización ---------- */
+async function encolar(r) {
+  try {
+    await dbTx('cola', 'readwrite', o => o.put(r));
+  } catch (e) {
+    toast('No hay espacio en el teléfono. Sincronizá y probá de nuevo.', true);
+    return false;
+  }
+  cola.push(r);
+  actualizarEstado();
+  sincronizar();
+  return true;
+}
+/** Hasta 3 registros o 1 MB por envío, para que las fotos pasen con señal débil. */
+function loteEnvio() {
+  const out = [];
+  let peso = 0;
+  for (const r of cola) {
+    const t = JSON.stringify(r).length;
+    if (out.length && (out.length >= 3 || peso + t > 1000000)) break;
+    out.push(r); peso += t;
+  }
+  return out;
+}
+async function sincronizar(manual) {
+  if (!equipo || !apiLista()) return;
+  if (!cola.length) { if (manual) { toast('Todo enviado'); actualizarTodo(false, true); } return; }
+  if (sincronizando) return;
+  if (!navigator.onLine) { if (manual) toast('Sin señal. Se envía cuando vuelva.', true); return; }
+  sincronizando = true;
+  actualizarEstado();
+  let enviados = 0, err = null;
+  try {
+    while (cola.length) {
+      const ids = await api('guardar', { registros: loteEnvio() }, 180000);
+      if (!ids || !ids.length) break;
+      await dbTx('cola', 'readwrite', o => { ids.forEach(id => o.delete(id)); });
+      const ok = new Set(ids);
+      cola = cola.filter(r => !ok.has(r.id));
+      enviados += ids.length;
+      actualizarEstado();
+    }
+  } catch (e) {
+    err = e;
+  }
+  sincronizando = false;
+  actualizarEstado();
+  if (err && !claveRechazada(err) && manual) toast('No se pudo enviar: ' + err.message, true);
+  if (enviados) { refrescarRegistros(); if (!err) toast('Enviado a la hoja'); }
+}
+function actualizarEstado() {
+  const n = cola.length, on = navigator.onLine;
+  $('estado').className = 'estado ' + (!on ? 'off' : n ? 'pend' : 'ok');
+  $('estadoTxt').textContent = sincronizando ? 'Enviando…' : !on ? (n ? 'Sin señal, ' + n + ' sin enviar' : 'Sin señal') : n ? n + ' sin enviar' : 'Todo enviado';
+  if (!$('tab-reg').hidden) pintarReg();
+}
+
+/* ---------- registros ---------- */
+async function refrescarRegistros(manual) {
+  if (!equipo || !apiLista() || !navigator.onLine) { if (manual) toast('Sin señal. Muestro lo último guardado.', true); return; }
+  try {
+    recientes = (await api('recientes')) || [];
+    dbSet('recientes', recientes).catch(() => {});
+    pintarReg();
+    if (manual) toast('Lista actualizada');
+  } catch (e) {
+    if (!claveRechazada(e) && manual) toast('No se pudo actualizar', true);
+  }
+}
+function fila(r, pend) {
+  if (r.tabla === 'orden') {
+    const lotes = Array.isArray(r.lotes) ? r.lotes.map(l => l.lote).join(', ') : r.lote;
+    const has = Array.isArray(r.lotes) ? r.lotes.reduce((a, l) => a + (Number(l.has) || 0), 0) : r.has;
+    const pdf = r.pdf && /^https:/.test(r.pdf) ? '<a class="pdflink" href="' + esc(r.pdf) + '" target="_blank" rel="noopener">Abrir PDF</a> &nbsp; <button class="btn-link" data-u="' + esc(r.pdf) + '" data-t="' + esc(r.nro) + '" onclick="compartirPdf(this)">Compartir</button>' : (r.pdf ? '<div class="dato">' + esc(r.pdf) + '</div>' : (pend ? '' : ''));
+    return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.nro || 'Orden') + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>Orden de aplicación: ' + esc(lotes) + '</div><div class="dato">' + fmt1(has) + ' ha</div>' + pdf + '</div>';
+  }
+  const titulo = r.tabla === 'mon' ? esc(r.tipo) + ': ' + esc(r.problema) : 'Conteo de ' + (r.momento === 'Siembra' ? 'siembra' : 'emergencia');
+  const dato = r.tabla === 'mon'
+    ? fmt1(r.incidencia) + '% de incidencia' + (r.severidad ? ', severidad ' + esc(r.severidad) : '')
+    : fmt0(r.ha) + (r.momento === 'Siembra' ? ' semillas/ha' : ' plantas/ha') + (r.logro !== '' && r.logro != null ? ', logro ' + fmt1(r.logro) + '%' : '');
+  const mapa = (r.lat !== '' && r.lat != null) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(r.lat + ',' + r.lng) + '" target="_blank" rel="noopener">Ver en el mapa</a>' : '';
+  return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.lote) + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>' + titulo + '</div><div class="dato">' + dato + '</div>' + mapa + '</div>';
+}
+function compartirPdf(b) {
+  const u = b.dataset.u, t = 'Orden de aplicación ' + b.dataset.t;
+  if (navigator.share) navigator.share({ title: t, text: t, url: u }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(u).then(() => toast('Link copiado'), () => toast('No se pudo copiar', true));
+}
+function pintarReg() {
+  let h = '';
+  if (cola.length) h += '<h2>Sin enviar (' + cola.length + ')</h2>' + cola.slice().reverse().map(r => fila(r, true)).join('');
+  h += '<h2>Últimos registros</h2>';
+  h += recientes.length ? recientes.map(r => fila(r, false)).join('') : '<p class="vacio">Todavía no hay registros. Cargá el primer punto en Monitoreo o en Conteo.</p>';
+  $('listaReg').innerHTML = h;
+}
+
+/* ---------- mapa y detección del lote ---------- */
+let mapa = null, capaLotes = null, marcador = null;
+function ptEnRing(x, y, ring) {
+  let d = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) d = !d;
+  }
+  return d;
+}
+function ptEnPoly(x, y, poly) {
+  if (!ptEnRing(x, y, poly[0])) return false;
+  for (let k = 1; k < poly.length; k++) if (ptEnRing(x, y, poly[k])) return false;
+  return true;
+}
+function loteEn(lat, lng) {
+  for (const g of (datos.geo || [])) for (const p of g.polys) if (ptEnPoly(lng, lat, p)) return g;
+  return null;
+}
+function distSeg(ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+  const t = L ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L)) : 0;
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+function distALote(lat, lng, g) {
+  const k = Math.cos(lat * Math.PI / 180) * 111320, R = 111320;
+  let best = Infinity;
+  g.polys.forEach(p => {
+    const r = p[0];
+    for (let i = 0; i < r.length - 1; i++) {
+      best = Math.min(best, distSeg((r[i][0] - lng) * k, (r[i][1] - lat) * R, (r[i + 1][0] - lng) * k, (r[i + 1][1] - lat) * R));
+    }
+  });
+  return best;
+}
+function detectarLote() {
+  const b = $('loteBadge');
+  if (!pos || !(datos.geo && datos.geo.length)) { b.hidden = true; return; }
+  const g = loteEn(pos.lat, pos.lng);
+  b.hidden = false;
+  if (g && [...$('campo').options].some(o => o.value === g.campo)) {
+    $('campo').value = g.campo;
+    ctx.lote = g.lote;
+    poblarLotes();
+    guardarCtx();
+    b.className = 'lotebadge';
+    b.textContent = 'Estás en el lote ' + g.lote + ' de ' + g.campo;
+  } else if (g) {
+    b.className = 'lotebadge fuera';
+    b.textContent = 'Estás en ' + g.lote + ', pero ese lote no está en la hoja Lotes.';
+  } else {
+    let best = null, bd = Infinity;
+    datos.geo.forEach(x => { const d = distALote(pos.lat, pos.lng, x); if (d < bd) { bd = d; best = x; } });
+    b.className = 'lotebadge fuera';
+    b.textContent = 'Estás fuera de los lotes. El más cercano es ' + best.lote + ' (a ' + fmt0(bd) + ' m). Quedó el lote que tenías elegido.';
+  }
+}
+function elegirLote(g) {
+  if ([...$('campo').options].some(o => o.value === g.campo)) {
+    $('campo').value = g.campo;
+    ctx.lote = g.lote;
+    poblarLotes();
+    guardarCtx();
+    toast('Lote ' + g.lote);
+  }
+}
+function toggleMapa() {
+  const el = $('map');
+  el.hidden = !el.hidden;
+  $('btnMapa').textContent = el.hidden ? 'Ver mapa de lotes' : 'Ocultar mapa';
+  $('ndviBar').hidden = el.hidden || !imagenes.length;
+  if (el.hidden) return;
+  iniciarMapa();
+  if (!imagenes.length) toast(imgError ? 'No se pudieron leer las imágenes NDVI: ' + imgError : 'No hay imágenes NDVI en la carpeta Monitoreo_Imagenes', true);
+  if (mapa) setTimeout(() => { mapa.invalidateSize(); ajustarMapa(); }, 60);
+}
+function iniciarMapa() {
+  if (mapa) { pintarMapa(); return; }
+  if (typeof L === 'undefined') { toast('No se pudo cargar el mapa. Revisá la conexión.', true); return; }
+  mapa = L.map('map');
+  // Leaflet necesita una vista inicial antes de agregar capas vectoriales; si no, los lotes no se dibujan
+  mapa.setView(pos ? [pos.lat, pos.lng] : [-25.2, -64.2], pos ? 15 : 6);
+  mapa.createPane('ndvi');
+  mapa.getPane('ndvi').style.zIndex = 250;
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imágenes: Esri, Maxar, Earthstar Geographics' });
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+  sat.addTo(mapa);
+  L.control.layers({ 'Satélite': sat, 'Calles': osm }).addTo(mapa);
+  capaLotes = L.layerGroup().addTo(mapa);
+  pintarMapa();
+}
+function pintarMapa() {
+  if (!mapa) return;
+  capaLotes.clearLayers();
+  (datos.geo || []).forEach(g => {
+    const act = g.campo === ctx.campo && g.lote === ctx.lote;
+    const poly = L.polygon(g.polys.map(p => p.map(r => r.map(c => [c[1], c[0]]))),
+      { color: act ? '#F4C21F' : '#FFFFFF', weight: act ? 4 : 2, fillOpacity: act ? 0.22 : 0.04 });
+    poly.bindTooltip(g.lote);
+    poly.on('click', () => elegirLote(g));
+    poly.addTo(capaLotes);
+  });
+  if (marcador) { marcador.remove(); marcador = null; }
+  if (pos) marcador = L.circleMarker([pos.lat, pos.lng], { radius: 8, color: '#FFFFFF', weight: 3, fillColor: '#B8372A', fillOpacity: 1 }).addTo(mapa);
+}
+function ajustarMapa() {
+  if (!mapa) return;
+  const geo = datos.geo || [];
+  const act = geo.find(g => g.campo === ctx.campo && g.lote === ctx.lote);
+  const lista = act ? [act] : geo;
+  const b = L.latLngBounds([]);
+  lista.forEach(g => g.polys.forEach(p => p[0].forEach(c => b.extend([c[1], c[0]]))));
+  if (b.isValid()) mapa.fitBounds(b, { padding: [20, 20] });
+  else if (pos) mapa.setView([pos.lat, pos.lng], 16);
+  else mapa.setView([-25.2, -64.2], 6);
+}
+
+/* ---------- imágenes NDVI (carpeta Monitoreo_Imagenes del Drive) ---------- */
+let imagenes = lee('mc_imgs', []);
+let capaNdvi = null;
+let imgError = '';
+const imgCache = {};
+async function cargarImagenes() {
+  if (!equipo || !apiLista() || !navigator.onLine) { armarNdviSel(); return; }
+  try {
+    imagenes = (await api('imagenes')) || [];
+    imgError = '';
+    escribe('mc_imgs', imagenes);
+    armarNdviSel();
+    await guardarNdviEnCelular();
+  } catch (e) {
+    imgError = e.message;
+    armarNdviSel();
+  }
+}
+/** Deja la imagen más reciente en el celular y borra las que ya no están en Drive. */
+async function guardarNdviEnCelular() {
+  const vigentes = new Set(imagenes.map(i => 'img:' + i.id));
+  const claves = await dbKeys();
+  for (const k of claves) if (String(k).startsWith('img:') && !vigentes.has(k)) await dbDel(k);
+  const ult = imagenes[0];
+  if (ult && !claves.includes('img:' + ult.id)) await dbSet('img:' + ult.id, await api('imagen', { id: ult.id }, 120000));
+}
+function fechaCorta(f) { const a = f.split('-'); return a[2] + '/' + a[1] + '/' + a[0]; }
+function haceDias(f) {
+  const d = Math.round((Date.now() - new Date(f + 'T12:00:00').getTime()) / 86400000);
+  return d <= 0 ? 'de hoy' : d === 1 ? 'de ayer' : 'de hace ' + d + ' días';
+}
+function armarNdviSel() {
+  $('ndviSel').innerHTML = imagenes.map(i => '<option value="' + esc(i.id) + '">' + esc(fechaCorta(i.fecha)) + '</option>').join('');
+  $('ndviBar').hidden = $('map').hidden || !imagenes.length;
+}
+function quitarNdvi() {
+  if (capaNdvi) { capaNdvi.remove(); capaNdvi = null; }
+  $('ndviInfo').textContent = '';
+}
+function toggleNdvi() { if ($('ndviOn').checked) mostrarNdvi(); else quitarNdvi(); }
+function cambiarNdvi() { if ($('ndviOn').checked) mostrarNdvi(); }
+function opacidadNdvi() { if (capaNdvi) capaNdvi.setOpacity(parseFloat($('ndviOp').value)); }
+async function mostrarNdvi() {
+  const im = imagenes.find(i => i.id === $('ndviSel').value);
+  if (!im || !mapa) return;
+  const poner = url => {
+    quitarNdvi();
+    capaNdvi = L.imageOverlay(url, im.bounds, { pane: 'ndvi', opacity: parseFloat($('ndviOp').value), interactive: false }).addTo(mapa);
+    $('ndviInfo').textContent = 'NDVI del ' + fechaCorta(im.fecha) + ' (' + haceDias(im.fecha) + ')';
+  };
+  if (!imgCache[im.id]) { try { imgCache[im.id] = await dbGet('img:' + im.id); } catch (e) { /* no guardada */ } }
+  if (imgCache[im.id]) { poner(imgCache[im.id]); return; }
+  if (!navigator.onLine) { $('ndviOn').checked = false; toast('Sin señal: no se puede bajar la imagen', true); return; }
+  $('ndviInfo').textContent = 'Bajando la imagen…';
+  try {
+    const url = await api('imagen', { id: im.id }, 120000);
+    imgCache[im.id] = url;
+    dbSet('img:' + im.id, url).catch(() => {});
+    if ($('ndviOn').checked) poner(url);
+  } catch (e) {
+    $('ndviOn').checked = false; $('ndviInfo').textContent = '';
+    toast('No se pudo bajar la imagen: ' + e.message, true);
+  }
+}
+
+/* ---------- órdenes de aplicación ---------- */
+let ordLotes = {}, ordCampo = '', ordProds = [], borradorMaq = '';
+const PROD_VACIO = () => ({ idx: '', dosis: '', total: '', modo: 'dosis' });
+const r3 = n => String(Math.round(n * 1000) / 1000);
+const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+function fmtCant(v, unidad) {
+  const b = String(unidad || '').replace('/ha', '').trim(), bl = b.toLowerCase();
+  const f = n => (Math.round(n * 100) / 100).toLocaleString('es-AR');
+  if ((bl === 'cc' || bl === 'ml') && v >= 1000) return f(v / 1000) + ' L';
+  if (bl === 'g' && v >= 1000) return f(v / 1000) + ' kg';
+  return f(v) + ' ' + b;
+}
+function abrirOrden() {
+  const clave = lee(LS.clave, '');
+  $('ordClave').hidden = !!clave;
+  $('ordForm').hidden = !clave;
+  if (!clave) {
+    $('ordClaveMsg').textContent = datos.hayClave === false ? 'Todavía no hay clave definida. En la planilla: menú Monitoreo > Definir clave de órdenes.' : 'Ingresá la clave para crear órdenes.';
+    return;
+  }
+  if (!$('ordResp').value) $('ordResp').value = lee(LS.resp, '') || (equipo ? equipo.nombre : '');
+  armarMaquinas();
+  armarOrdLotes();
+  if (!ordProds.length) ordProds = [PROD_VACIO()];
+  pintarProds();
+  pintarOrd();
+}
+async function entrarClave() {
+  const k = $('claveIn').value.trim();
+  if (!k) return toast('Escribí la clave', true);
+  if (!navigator.onLine) return toast('Sin señal para verificar la clave', true);
+  try {
+    if (!(await api('verificarClave', { clave: k }))) return toast('Clave incorrecta', true);
+    escribe(LS.clave, k); $('claveIn').value = ''; abrirOrden();
+  } catch (e) {
+    if (!claveRechazada(e)) toast('No se pudo verificar: ' + e.message, true);
+  }
+}
+function salirClave() {
+  try { localStorage.removeItem(LS.clave); } catch (e) {}
+  abrirOrden();
+}
+function armarMaquinas() {
+  const mq = (datos.maquinas && datos.maquinas.length) ? datos.maquinas : [];
+  const prev = $('ordMaq').value || borradorMaq;
+  $('ordMaq').innerHTML = mq.length
+    ? mq.map((x, i) => '<option value="' + i + '">' + esc(x.maquina + (x.contratista ? ' - ' + x.contratista : '')) + '</option>').join('')
+    : '<option value="">Cargá máquinas en la hoja Maquinas</option>';
+  if (prev !== '' && mq[prev]) $('ordMaq').value = prev;
+}
+function armarOrdLotes() {
+  const campo = $('campo').value;
+  if (campo !== ordCampo) { ordLotes = {}; ordCampo = campo; }
+  const lotes = datos.lotes.filter(l => l.campo === campo);
+  const cont = $('ordLotes');
+  if (!lotes.length) { cont.innerHTML = '<p class="vacio">No hay lotes para este campo.</p>'; return; }
+  cont.innerHTML = lotes.map((l, i) => {
+    const s = ordLotes[l.lote] || (ordLotes[l.lote] = { on: false, has: Number(l.has) || 0 });
+    return '<div class="olote"><input type="checkbox" id="ol' + i + '"' + (s.on ? ' checked' : '') + ' data-l="' + esc(l.lote) + '" onchange="ordLote(this)">' +
+      '<label for="ol' + i + '" style="margin:0;color:var(--ink);font-weight:700">' + esc(l.lote) + '</label>' +
+      '<input type="number" inputmode="decimal" step="0.1" min="0" value="' + (s.has || '') + '" data-l="' + esc(l.lote) + '" oninput="ordHas(this)" aria-label="Hectáreas de ' + esc(l.lote) + '"></div>';
+  }).join('');
+}
+function ordLote(el) { ordLotes[el.dataset.l].on = el.checked; pintarOrd(); }
+function ordHas(el) { ordLotes[el.dataset.l].has = num(el.value); pintarOrd(); }
+function hasTotal() {
+  return Object.keys(ordLotes).reduce((a, k) => a + (ordLotes[k].on ? ordLotes[k].has : 0), 0);
+}
+function pintarProds() {
+  const prods = datos.productos || [];
+  const opts = '<option value="">Elegí producto</option>' + prods.map((p, i) => '<option value="' + i + '">' + esc(p.nombre + (p.tipo ? ' (' + p.tipo + ')' : '')) + '</option>').join('');
+  $('ordProds').innerHTML = ordProds.map((r, i) => {
+    return '<div class="oprod"><div class="top"><b>Producto ' + (i + 1) + '</b>' +
+      (ordProds.length > 1 ? '<button class="quitar" onclick="quitarProd(' + i + ')">Quitar</button>' : '') + '</div>' +
+      '<select id="op' + i + '" onchange="selProd(' + i + ',this.value)">' + opts + '</select>' +
+      '<div class="grid2"><div><label for="od' + i + '" id="ou' + i + '">Dosis</label>' +
+      '<input id="od' + i + '" type="number" inputmode="decimal" min="0" step="any" value="' + esc(r.dosis) + '" oninput="dosisProd(' + i + ',this.value)"></div>' +
+      '<div><label for="oc' + i + '" id="ov' + i + '">Cantidad total</label>' +
+      '<input id="oc' + i + '" type="number" inputmode="decimal" min="0" step="any" value="' + esc(r.total) + '" oninput="totalProd(' + i + ',this.value)"></div></div>' +
+      '<div class="tot" id="ot' + i + '"></div></div>';
+  }).join('');
+  ordProds.forEach((r, i) => { if (r.idx !== undefined && r.idx !== '') $('op' + i).value = r.idx; });
+  $('btnAddProd').hidden = ordProds.length >= 7;
+  pintarOrd();
+}
+function agregarProd() { if (ordProds.length < 7) { ordProds.push(PROD_VACIO()); pintarProds(); } }
+function quitarProd(i) { ordProds.splice(i, 1); pintarProds(); }
+function selProd(i, v) { ordProds[i].idx = v; pintarOrd(); }
+function dosisProd(i, v) { ordProds[i].dosis = v; ordProds[i].modo = 'dosis'; pintarOrd(); }
+function totalProd(i, v) { ordProds[i].total = v; ordProds[i].modo = 'total'; pintarOrd(); }
+function pintarOrd() {
+  const has = hasTotal();
+  $('ordHasTot').textContent = 'Total: ' + fmt1(has) + ' ha';
+  const caldo = num($('ordCaldo').value);
+  $('ordCaldoTot').textContent = caldo ? fmt0(caldo * has) + ' L' : '-';
+  ordProds.forEach((r, i) => {
+    const p = (datos.productos || [])[r.idx];
+    const u = $('ou' + i), t = $('ot' + i);
+    if (!u || !t) return;
+    const base = p ? String(p.unidad).replace('/ha', '').trim() : '';
+    u.textContent = p ? 'Dosis (' + p.unidad + ')' : 'Dosis';
+    $('ov' + i).textContent = p ? 'Cantidad total (' + base + ')' : 'Cantidad total';
+    let tot;
+    if (r.modo === 'total') {
+      const d = has ? num(r.total) / has : 0;
+      r.dosis = d ? r3(d) : '';
+      $('od' + i).value = r.dosis;
+      tot = num(r.total);
+    } else {
+      tot = num(r.dosis) * has;
+      r.total = tot ? r3(tot) : '';
+      $('oc' + i).value = r.total;
+    }
+    t.textContent = p && tot ? 'Total: ' + fmtCant(tot, p.unidad) : '';
+  });
+}
+const guardarOrden = unaVez(async () => {
+  const clave = lee(LS.clave, '');
+  if (!clave) return abrirOrden();
+  guardarCtx();
+  const lotes = Object.keys(ordLotes).filter(k => ordLotes[k].on && ordLotes[k].has > 0).map(k => ({ lote: k, has: ordLotes[k].has }));
+  if (!lotes.length) return toast('Elegí al menos un lote con hectáreas', true);
+  const prods = [];
+  for (const r of ordProds) {
+    const p = (datos.productos || [])[r.idx];
+    const usaTotal = r.modo === 'total';
+    const hasT = hasTotal();
+    const dosis = usaTotal ? (hasT ? num(r.total) / hasT : 0) : num(r.dosis);
+    if (!p && !dosis) continue;
+    if (!p) return toast('Elegí el producto de cada fila', true);
+    if (!dosis) return toast('Falta la dosis o la cantidad de ' + p.nombre, true);
+    prods.push({ nombre: p.nombre, tipo: p.tipo, form: p.form, unidad: p.unidad, dosis: dosis, total: usaTotal ? num(r.total) : '' });
+  }
+  if (!prods.length) return toast('Agregá al menos un producto', true);
+  const resp = $('ordResp').value.trim();
+  if (!resp) return toast('Indicá el responsable', true);
+  const mq = (datos.maquinas || [])[$('ordMaq').value];
+  if (!mq) return toast('Elegí la máquina', true);
+  escribe(LS.resp, resp);
+  const r = Object.assign({ id: nuevoId(), tabla: 'orden' }, cuando(), {
+    campania: ctx.campania, campo: ctx.campo, cultivo: ctx.cultivo, lotes: lotes,
+    maquina: mq.maquina, contratista: mq.contratista, caldo: num($('ordCaldo').value),
+    productos: prods, responsable: resp, obs: $('ordObs').value.trim(), mapa: $('ordMapa').checked, clave: clave });
+  if (await encolar(r)) {
+    ordLotes = {}; ordCampo = ''; ordProds = [PROD_VACIO()];
+    $('ordObs').value = ''; $('ordCaldo').value = '';
+    abrirOrden();
+    toast('Orden guardada. El PDF aparece en Registros.');
+    await guardarBorrador();
+  }
+});
+
+/* ---------- pestañas e inicio ---------- */
+function tab(n) {
+  ['mon', 'cont', 'ord', 'reg'].forEach(k => { $('tab-' + k).hidden = k !== n; $('t-' + k).classList.toggle('on', k === n); });
+  $('ctxwrap').hidden = n === 'reg';
+  $('loteWrap').hidden = n === 'ord';
+  $('gpsCard').hidden = n === 'ord';
+  if (n === 'ord') abrirOrden();
+  if (n === 'reg') { pintarReg(); refrescarRegistros(); pintarCfg(); }
+  window.scrollTo(0, 0);
+}
+async function cargarDatos() {
+  if (!equipo || !apiLista() || !navigator.onLine) return;
+  try {
+    const d = await api('datos');
+    datos = d;
+    await dbSet('datos', d);
+    poblarCtx(); detectarLote(); pintarMapa();
+    if (!$('tab-ord').hidden) abrirOrden();
+    pintarCfg();
+  } catch (e) {
+    if (!claveRechazada(e)) toast('Sin conexión: uso la lista de lotes guardada', true);
+  }
+}
+/** Trae del servidor lotes, catálogo, registros e imágenes. Sin forzar, como mucho cada 5 minutos. */
+function actualizarTodo(manual, forzar) {
+  if (!manual && !forzar && Date.now() - ultimaActualizacion < 300000) return;
+  ultimaActualizacion = Date.now();
+  cargarDatos(); refrescarRegistros(manual); cargarImagenes();
+}
+async function init() {
+  try {
+    const [d, q, r] = await Promise.all([dbGet('datos'), dbTx('cola', 'readonly', o => o.getAll()), dbGet('recientes')]);
+    if (d) datos = d;
+    cola = q || [];
+    recientes = r || [];
+  } catch (e) {
+    toast('No se pudo abrir el guardado del teléfono', true);
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; $('btnInstalar').hidden = false; });
+  ponerAhora();
+  ['fecha', 'hora'].forEach(id => $(id).addEventListener('input', () => { cuandoManual = true; $('btnAhora').hidden = false; }));
+  setInterval(() => { if (!cuandoManual) ponerAhora(); }, 30000);
+  $('surcos').value = cfg.surcos; $('metros').value = cfg.metros;
+  ['surcos', 'metros'].forEach(id => $(id).addEventListener('input', () => {
+    cfg = { surcos: parseFloat($('surcos').value) || '', metros: parseFloat($('metros').value) || '' };
+    escribe(LS.cfg, cfg); pintarStand();
+  }));
+  $('campania').addEventListener('input', guardarCtx);
+  $('campo').addEventListener('change', () => { ctx.lote = ''; poblarLotes(); guardarCtx(); if (!$('tab-ord').hidden) armarOrdLotes(); pintarOrd(); });
+  $('lote').addEventListener('change', guardarCtx);
+  $('cultivo').addEventListener('change', guardarCtx);
+  $('lat').addEventListener('input', coordManual);
+  $('lng').addEventListener('input', coordManual);
+  $('conteo').addEventListener('keydown', e => { if (e.key === 'Enter') agregarMuestra(); });
+  window.addEventListener('online', () => { actualizarEstado(); sincronizar(); actualizarTodo(false, true); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { guardarBorrador(); return; }
+    sincronizar(); actualizarTodo();
+  });
+  document.addEventListener('input', programarBorrador);
+  document.addEventListener('click', programarBorrador);
+  window.addEventListener('offline', actualizarEstado);
+  setInterval(() => sincronizar(), 60000);
+
+  poblarCtx(); pintarInc(); pintarStand();
+  await restaurarBorrador();
+  actualizarEstado(); tomarGPS(); armarNdviSel();
+  if (!equipo || !apiLista()) { abrirSetup(); return; }
+  sincronizar(); actualizarTodo(false, true);
+}
+init();
+</script>
+</body>
+</html>
