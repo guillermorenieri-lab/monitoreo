@@ -197,6 +197,11 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
 
   <!-- MONITOREO -->
   <div id="tab-mon" class="tab">
+    <section class="card" id="lectCard" hidden>
+      <h2>En este punto</h2>
+      <div id="listaLect"></div>
+    </section>
+
     <section class="card">
       <h2>Qué observás</h2>
       <div class="seg" id="segTipo">
@@ -212,8 +217,28 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
     </section>
 
     <section class="card">
-      <h2>Incidencia</h2>
-      <div class="lbl" style="margin-top:0">Plantas evaluadas</div>
+      <h2 id="medTitulo">Conteo</h2>
+      <div id="metodoWrap">
+        <div class="lbl" style="margin-top:0">Cómo medís</div>
+        <div class="seg" id="segMet">
+          <button data-v="Golpe de paño" onclick="setMetodo('Golpe de paño')">Paño</button>
+          <button data-v="Metro lineal" onclick="setMetodo('Metro lineal')">Metro lineal</button>
+          <button data-v="Incidencia" onclick="setMetodo('Incidencia')">Incidencia</button>
+        </div>
+      </div>
+
+      <div id="bloqueConteo">
+        <div id="metrosWrap" hidden>
+          <label for="metrosLect">Metros de cada muestra</label>
+          <input id="metrosLect" type="number" inputmode="decimal" min="0.1" step="0.1" oninput="setMetros(this.value)">
+        </div>
+        <div id="golpes" style="margin-top:12px"></div>
+        <button class="btn" id="btnGolpe" style="width:100%" onclick="agregarGolpe()">+ Agregar golpe</button>
+        <div class="res" id="resConteo" hidden></div>
+      </div>
+
+      <div id="bloqueInc" hidden>
+      <div class="lbl" style="margin-top:12px">Plantas evaluadas</div>
       <div class="stepper">
         <button onclick="setNum('ev', m.ev-1)" aria-label="Una menos">−</button>
         <input id="ev" type="number" inputmode="numeric" min="1" onchange="setNum('ev', this.value)">
@@ -234,6 +259,9 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
         <button data-v="Media" onclick="setSev('Media')">Media</button>
         <button data-v="Alta" onclick="setSev('Alta')">Alta</button>
       </div>
+      </div>
+
+      <button class="btn" id="btnLectura" style="width:100%;margin-top:14px" onclick="agregarLectura()">+ Agregar otra plaga</button>
     </section>
 
     <section class="card">
@@ -358,6 +386,7 @@ const escribe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); re
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt0 = n => Math.round(Number(n) || 0).toLocaleString('es-AR');
 const fmt1 = n => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString('es-AR');
+const fmt2 = n => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('es-AR');
 
 let datos = { lotes: [], catalogo: {}, productos: [], maquinas: [] };
 let equipo = lee(LS.equipo, null);
@@ -370,7 +399,7 @@ let cola = [];
 let guardando = false;
 let ultimaActualizacion = 0;
 let promptInstalar = null;
-const m = { tipo:'Plaga', ev:10, af:0, sev:'', foto:'' };
+const m = { tipo:'Plaga', ev:10, af:0, sev:'', foto:'', metodo:'Golpe de paño', metros:1, cats:[], golpes:[['']], lecturas:[], incTocado:false };
 const st = { momento:'Siembra', muestras:[] };
 
 /* ---------- base de datos del celular (IndexedDB) ---------- */
@@ -494,6 +523,7 @@ function programarBorrador() {
 function leerBorrador() {
   const tabAct = ['mon', 'cont', 'ord', 'reg'].find(k => !$('tab-' + k).hidden);
   return { tab: tabAct, tipo: m.tipo, ev: m.ev, af: m.af, sev: m.sev, foto: m.foto,
+    metodo: m.metodo, metros: m.metros, cats: m.cats, golpes: m.golpes, lecturas: m.lecturas, incTocado: m.incTocado,
     problema: $('problema').value, otro: $('otro').value, estadio: $('estadio').value, obsMon: $('obsMon').value,
     momento: st.momento, muestras: st.muestras, conteo: $('conteo').value, dens: $('dens').value, obsSt: $('obsSt').value,
     ord: { lotes: ordLotes, campo: ordCampo, prods: ordProds, maq: $('ordMaq').value, caldo: $('ordCaldo').value,
@@ -513,6 +543,8 @@ async function restaurarBorrador() {
   if (b.sev) setSev(b.sev);
   if ([...$('problema').options].some(o => o.value === b.problema)) $('problema').value = b.problema;
   onProblema();
+  m.metodo = b.metodo || m.metodo; m.metros = b.metros || 1; m.lecturas = b.lecturas || []; m.incTocado = !!b.incTocado;
+  if (b.golpes && b.golpes.length && String(b.cats) === String(m.cats)) m.golpes = b.golpes;
   $('otro').value = b.otro || ''; $('estadio').value = b.estadio || ''; $('obsMon').value = b.obsMon || '';
   if (m.foto) { $('fotoPrev').src = m.foto; $('fotoWrap').hidden = false; }
   st.muestras = b.muestras || [];
@@ -524,7 +556,7 @@ async function restaurarBorrador() {
     $('ordMapa').checked = b.ord.mapa !== false;
     borradorMaq = b.ord.maq || '';
   }
-  pintarInc(); pintarStand();
+  pintarInc(); pintarStand(); pintarMetodo(); pintarLecturas();
   if (b.tab) tab(b.tab);
 }
 const unaVez = fn => async () => {
@@ -624,11 +656,137 @@ function poblarProblemas() {
   if ([...$('problema').options].some(o => o.value === prev)) $('problema').value = prev;
   onProblema();
 }
-function onProblema() { $('otroWrap').hidden = $('problema').value !== '__otro'; }
+function onProblema() {
+  $('otroWrap').hidden = $('problema').value !== '__otro';
+  const cats = catsDe($('problema').value);
+  if (String(cats) === String(m.cats)) return;
+  m.cats = cats;
+  m.golpes = [nuevoGolpe()];
+  pintarGolpes();
+}
 function setTipo(t) {
   m.tipo = t;
   document.querySelectorAll('#segTipo button').forEach(b => b.classList.toggle('on', b.dataset.v === t));
   poblarProblemas();
+  pintarMetodo();
+}
+/** Categorías de la hoja Catalogo. Si los datos guardados son anteriores, usa las habituales. */
+function catsDe(problema) {
+  if (m.tipo !== 'Plaga') return [];
+  if (datos.categorias) return datos.categorias[problema] || [];
+  if (/oruga|isoca/i.test(problema)) return ['Menos de 1 cm', 'Más de 1 cm'];
+  if (/chinche/i.test(problema)) return ['Ninfas', 'Adultos'];
+  return [];
+}
+function nuevoGolpe() { return m.cats.length ? m.cats.map(() => '') : ['']; }
+function metodoActual() { return m.tipo === 'Plaga' ? m.metodo : 'Incidencia'; }
+function setMetodo(v) { m.metodo = v; pintarMetodo(); }
+function setMetros(v) { m.metros = v; pintarConteo(); }
+function pintarMetodo() {
+  const met = metodoActual(), esInc = met === 'Incidencia', pano = met === 'Golpe de paño';
+  $('metodoWrap').hidden = m.tipo !== 'Plaga';
+  $('bloqueConteo').hidden = esInc;
+  $('bloqueInc').hidden = !esInc;
+  $('metrosWrap').hidden = met !== 'Metro lineal';
+  $('metrosLect').value = m.metros;
+  $('medTitulo').textContent = esInc ? 'Incidencia' : 'Conteo';
+  $('btnGolpe').textContent = pano ? '+ Agregar golpe' : '+ Agregar muestra';
+  $('btnLectura').textContent = '+ Agregar otra ' + m.tipo.toLowerCase();
+  document.querySelectorAll('#segMet button').forEach(b => b.classList.toggle('on', b.dataset.v === m.metodo));
+  pintarGolpes();
+}
+function pintarGolpes() {
+  const nombre = metodoActual() === 'Golpe de paño' ? 'Golpe' : 'Muestra';
+  const cols = m.cats.length ? m.cats : ['Cantidad'];
+  $('golpes').innerHTML = m.golpes.map((g, i) =>
+    '<div class="oprod"><div class="top"><b>' + nombre + ' ' + (i + 1) + '</b>' +
+    (m.golpes.length > 1 ? '<button class="quitar" onclick="quitarGolpe(' + i + ')">Quitar</button>' : '') + '</div>' +
+    '<div class="' + (cols.length > 1 ? 'grid2' : '') + '">' + cols.map((c, j) =>
+      '<div><label for="g' + i + '_' + j + '">' + esc(c) + '</label>' +
+      '<input id="g' + i + '_' + j + '" type="number" inputmode="numeric" min="0" step="1" value="' + esc(g[j]) + '" oninput="setGolpe(' + i + ',' + j + ',this.value)"></div>').join('') +
+    '</div></div>').join('');
+  pintarConteo();
+}
+function setGolpe(i, j, v) { m.golpes[i][j] = v; pintarConteo(); }
+function agregarGolpe() {
+  m.golpes.push(nuevoGolpe());
+  pintarGolpes();
+  $('g' + (m.golpes.length - 1) + '_0').focus();
+}
+function quitarGolpe(i) { m.golpes.splice(i, 1); pintarGolpes(); }
+const conteoNum = v => Math.max(0, Number(v) || 0);
+/** Promedio por metro. Cada golpe pesa igual; una categoría vacía en un golpe cargado cuenta 0. */
+function calcConteo(golpes, cats, metros) {
+  const usados = golpes.filter(g => g.some(v => v !== '' && v != null));
+  const mts = Number(metros) > 0 ? Number(metros) : 1;
+  const porCat = (cats.length ? cats : ['']).map((c, j) => {
+    const suma = usados.reduce((a, g) => a + conteoNum(g[j]), 0);
+    return { cat: c, prom: usados.length ? suma / (usados.length * mts) : 0 };
+  });
+  return { usados: usados, n: usados.length, porCat: porCat, total: porCat.reduce((a, c) => a + c.prom, 0) };
+}
+function textoConteo(c, metodo) {
+  const nombre = metodo === 'Golpe de paño' ? 'golpe' : 'muestra';
+  const det = c.porCat.filter(x => x.cat).map(x => x.cat + ': ' + fmt2(x.prom)).join(' · ');
+  return (det ? det + ' · ' : '') + c.n + ' ' + nombre + (c.n === 1 ? '' : 's');
+}
+function pintarConteo() {
+  const c = calcConteo(m.golpes, m.cats, m.metros), r = $('resConteo');
+  r.hidden = !c.n;
+  if (c.n) r.innerHTML = '<span class="big">' + fmt2(c.total) + '</span><span class="u">por metro</span><div class="det">' + esc(textoConteo(c, metodoActual())) + '</div>';
+}
+function hayLectura() {
+  if ($('problema').value === '__otro' && $('otro').value.trim()) return true;
+  return metodoActual() === 'Incidencia' ? m.incTocado : calcConteo(m.golpes, m.cats, m.metros).n > 0;
+}
+/** Convierte lo cargado en una lectura. Devuelve null y avisa si falta algo. */
+function armarLectura() {
+  let problema = $('problema').value;
+  if (problema === '__otro') problema = $('otro').value.trim();
+  if (!problema) { toast('Indicá qué observaste', true); return null; }
+  if (m.lecturas.some(l => l.problema === problema)) { toast(problema + ' ya está en este punto', true); return null; }
+  const metodo = metodoActual();
+  if (metodo === 'Incidencia') return { tipo: m.tipo, problema: problema, metodo: metodo, ev: m.ev, af: m.af, sev: m.sev };
+  if (metodo === 'Metro lineal' && !(Number(m.metros) > 0)) { toast('Indicá los metros de la muestra', true); return null; }
+  const c = calcConteo(m.golpes, m.cats, m.metros);
+  if (!c.n) { toast('Cargá la cantidad contada', true); return null; }
+  return { tipo: m.tipo, problema: problema, metodo: metodo, cats: m.cats.slice(), golpes: c.usados.map(g => g.slice()),
+           metros: metodo === 'Metro lineal' ? Number(m.metros) : 1 };
+}
+function limpiarLectura() {
+  m.golpes = [nuevoGolpe()]; m.af = 0; m.sev = ''; m.incTocado = false;
+  document.querySelectorAll('#segSev button').forEach(b => b.classList.remove('on'));
+  $('otro').value = '';
+  pintarGolpes(); pintarInc();
+}
+function agregarLectura() {
+  if (!hayLectura()) return toast(metodoActual() === 'Incidencia' ? 'Cargá las plantas evaluadas y afectadas' : 'Cargá la cantidad contada', true);
+  const l = armarLectura();
+  if (!l) return;
+  m.lecturas.push(l);
+  limpiarLectura();
+  pintarLecturas();
+  toast('Agregada. Elegí la siguiente');
+  window.scrollTo({ top: $('tab-mon').offsetTop - 70 });
+}
+function quitarLectura(i) { m.lecturas.splice(i, 1); pintarLecturas(); }
+function resumenLectura(l) {
+  if (l.metodo === 'Incidencia') return fmt1(l.af / l.ev * 100) + '% de incidencia' + (l.sev ? ', severidad ' + l.sev : '');
+  const c = calcConteo(l.golpes, l.cats, l.metros);
+  return fmt2(c.total) + ' por metro · ' + textoConteo(c, l.metodo);
+}
+function pintarLecturas() {
+  $('lectCard').hidden = !m.lecturas.length;
+  $('listaLect').innerHTML = m.lecturas.map((l, i) =>
+    '<div class="oprod"><div class="top"><b>' + esc(l.problema) + '</b><button class="quitar" onclick="quitarLectura(' + i + ')">Quitar</button></div>' +
+    '<div class="tot">' + esc(resumenLectura(l)) + '</div></div>').join('');
+}
+/** Lo que recibe la hoja: una lectura por plaga y categoría. */
+function lecturasEnvio(l) {
+  if (l.metodo === 'Incidencia') return [{ tipo: l.tipo, problema: l.problema, metodo: l.metodo, categoria: '',
+    evaluadas: l.ev, afectadas: l.af, incidencia: Math.round(l.af / l.ev * 1000) / 10, severidad: l.sev }];
+  return (l.cats.length ? l.cats : ['']).map((c, j) => ({ tipo: l.tipo, problema: l.problema, metodo: l.metodo, categoria: c,
+    metros: l.metros, conteos: l.golpes.map(g => conteoNum(g[j])) }));
 }
 function setSev(v) {
   m.sev = m.sev === v ? '' : v;
@@ -638,6 +796,7 @@ function setNum(k, v) {
   v = Math.max(0, Math.floor(Number(v) || 0));
   if (k === 'ev') { m.ev = Math.max(1, v); if (m.af > m.ev) m.af = m.ev; }
   else m.af = Math.min(v, m.ev);
+  m.incTocado = true;
   pintarInc();
 }
 function pintarInc() {
@@ -681,21 +840,23 @@ function base() {
 const guardarMon = unaVez(async () => {
   guardarCtx();
   if (!ctx.lote) return toast('Elegí el lote', true);
-  let problema = $('problema').value;
-  if (problema === '__otro') problema = $('otro').value.trim();
-  if (!problema) return toast('Indicá qué observaste', true);
+  const lecturas = m.lecturas.slice();
+  if (hayLectura()) {
+    const l = armarLectura();
+    if (!l) return;
+    lecturas.push(l);
+  }
+  if (!lecturas.length && !confirm('No cargaste lecturas. ¿Guardar este punto como Sin plagas?')) return;
   if (!pos && !confirm('No hay ubicación del punto. ¿Guardar igual?')) return;
-  const r = Object.assign({ id: nuevoId(), tabla: 'mon' }, cuando(), base(), {
-    estadio: $('estadio').value.trim(), tipo: m.tipo, problema: problema,
-    evaluadas: m.ev, afectadas: m.af, incidencia: Math.round(m.af / m.ev * 1000) / 10,
-    severidad: m.sev, obs: $('obsMon').value.trim(), foto: m.foto });
+  const r = Object.assign({ id: nuevoId(), tabla: 'punto' }, cuando(), base(), {
+    estadio: $('estadio').value.trim(), obs: $('obsMon').value.trim(), foto: m.foto,
+    lecturas: lecturas.length ? lecturas.flatMap(lecturasEnvio) : [{ tipo: 'Plaga', problema: 'Sin plagas', metodo: 'Sin presencia' }] });
   if (await encolar(r)) {
     toast('Punto guardado en ' + ctx.lote);
     ponerAhora();
-    m.af = 0; m.sev = ''; m.foto = '';
-    document.querySelectorAll('#segSev button').forEach(b => b.classList.remove('on'));
-    $('obsMon').value = ''; $('otro').value = ''; $('fotoWrap').hidden = true;
-    pintarInc();
+    m.lecturas = []; m.foto = '';
+    limpiarLectura(); pintarLecturas();
+    $('obsMon').value = ''; $('fotoWrap').hidden = true;
     pos = null; pintarPos(); tomarGPS();
     await guardarBorrador();
   }
@@ -844,6 +1005,11 @@ async function refrescarRegistros(manual) {
     if (!claveRechazada(e) && manual) toast('No se pudo actualizar', true);
   }
 }
+function datoMon(r) {
+  if (r.metodo === 'Sin presencia') return 'Sin presencia';
+  if (r.promedio !== '' && r.promedio != null) return fmt2(r.promedio) + ' por metro' + (r.categoria ? ' · ' + esc(r.categoria) : '');
+  return fmt1(r.incidencia) + '% de incidencia' + (r.severidad ? ', severidad ' + esc(r.severidad) : '');
+}
 function fila(r, pend) {
   if (r.tabla === 'orden') {
     const lotes = Array.isArray(r.lotes) ? r.lotes.map(l => l.lote).join(', ') : r.lote;
@@ -851,9 +1017,10 @@ function fila(r, pend) {
     const pdf = r.pdf && /^https:/.test(r.pdf) ? '<a class="pdflink" href="' + esc(r.pdf) + '" target="_blank" rel="noopener">Abrir PDF</a> &nbsp; <button class="btn-link" data-u="' + esc(r.pdf) + '" data-t="' + esc(r.nro) + '" onclick="compartirPdf(this)">Compartir</button>' : (r.pdf ? '<div class="dato">' + esc(r.pdf) + '</div>' : (pend ? '' : ''));
     return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.nro || 'Orden') + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>Orden de aplicación: ' + esc(lotes) + '</div><div class="dato">' + fmt1(has) + ' ha</div>' + pdf + '</div>';
   }
-  const titulo = r.tabla === 'mon' ? esc(r.tipo) + ': ' + esc(r.problema) : 'Conteo de ' + (r.momento === 'Siembra' ? 'siembra' : 'emergencia');
-  const dato = r.tabla === 'mon'
-    ? fmt1(r.incidencia) + '% de incidencia' + (r.severidad ? ', severidad ' + esc(r.severidad) : '')
+  const titulo = r.tabla === 'punto' ? 'Punto de monitoreo'
+    : r.tabla === 'mon' ? esc(r.tipo) + ': ' + esc(r.problema) : 'Conteo de ' + (r.momento === 'Siembra' ? 'siembra' : 'emergencia');
+  const dato = r.tabla === 'punto' ? esc([...new Set((r.lecturas || []).map(l => l.problema))].join(', '))
+    : r.tabla === 'mon' ? datoMon(r)
     : fmt0(r.ha) + (r.momento === 'Siembra' ? ' semillas/ha' : ' plantas/ha') + (r.logro !== '' && r.logro != null ? ', logro ' + fmt1(r.logro) + '%' : '');
   const mapa = (r.lat !== '' && r.lat != null) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(r.lat + ',' + r.lng) + '" target="_blank" rel="noopener">Ver en el mapa</a>' : '';
   return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.lote) + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>' + titulo + '</div><div class="dato">' + dato + '</div>' + mapa + '</div>';
@@ -1271,7 +1438,7 @@ async function init() {
   window.addEventListener('offline', actualizarEstado);
   setInterval(() => sincronizar(), 60000);
 
-  poblarCtx(); pintarInc(); pintarStand();
+  poblarCtx(); pintarInc(); pintarStand(); pintarMetodo(); pintarLecturas();
   await restaurarBorrador();
   actualizarEstado(); tomarGPS(); armarNdviSel();
   if (!equipo || !apiLista()) { abrirSetup(); return; }
