@@ -101,9 +101,9 @@ button{font-family:var(--body);cursor:pointer}
 .fila a{display:inline-block;margin-top:4px;color:var(--field);font-weight:600}
 .vacio{margin:6px 2px;color:var(--mute)}
 
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:2px solid var(--ink);
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:2px solid var(--ink);
   padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs button{min-height:68px;padding:0 2px;border:0;border-right:2px solid var(--ink);background:#fff;color:var(--ink);font:700 17px var(--head)}
+.tabs button{min-height:68px;padding:0 2px;border:0;border-right:2px solid var(--ink);background:#fff;color:var(--ink);font:700 15px var(--head)}
 .tabs button:last-child{border-right:0}
 .olote{display:grid;grid-template-columns:44px 1fr 110px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
 .olote input[type=checkbox]{width:30px;height:30px;min-height:0;margin:0 auto}
@@ -114,6 +114,20 @@ button{font-family:var(--body);cursor:pointer}
 .oprod .quitar{border:0;background:none;color:var(--alert);font-weight:700;font-size:16px;min-height:40px}
 .otot{font:700 20px var(--head);margin-top:10px}
 .pdflink{display:inline-block;margin-top:4px;font-weight:700}
+details.res-grupo{margin-bottom:10px;border:2px solid var(--ink);border-radius:10px;background:#fff}
+details.res-grupo>summary{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;min-height:52px;padding:12px 14px;cursor:pointer;font:700 21px var(--head)}
+details.res-grupo>summary span{color:var(--mute);font:500 16px var(--body)}
+details.res-grupo>.dentro{padding:0 10px 10px}
+details.res-lote{border-color:var(--field);background:#F7FAF8}
+.res-dia{margin-top:10px;padding:10px 12px;border:2px solid var(--line);border-radius:8px;background:#fff}
+.res-dia h3{margin:0 0 6px;font:700 19px var(--head)}
+.res-dia h3 span{color:var(--mute);font:500 15px var(--body)}
+.res-lec{padding:6px 0;border-top:1px solid var(--line)}
+.res-lec b{display:block}
+.res-lec .val{font-weight:700;color:var(--field-d)}
+.res-lec .det{color:var(--mute);font-size:16px}
+.res-punto{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:16px}
+.res-punto a{color:var(--field);font-weight:600;margin-right:12px}
 .tabs button.on{background:var(--field);color:#fff}
 
 #toast{position:fixed;left:14px;right:14px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9;padding:14px 16px;border:2px solid var(--ink);
@@ -356,6 +370,17 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
     </div>
   </div>
 
+  <!-- RESUMEN -->
+  <div id="tab-res" class="tab" hidden>
+    <section class="card">
+      <h2>Monitoreos de la semana</h2>
+      <label for="resSemana">Semana</label>
+      <select id="resSemana" onchange="pintarResumen()"></select>
+    </section>
+    <div id="resLista"></div>
+    <button class="btn" style="width:100%" onclick="refrescarResumen(true)">Actualizar resumen</button>
+  </div>
+
   <!-- REGISTROS -->
   <div id="tab-reg" class="tab" hidden>
     <div id="listaReg"></div>
@@ -374,6 +399,7 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
   <button id="t-mon" class="on" onclick="tab('mon')">Monitoreo</button>
   <button id="t-cont" onclick="tab('cont')">Conteo</button>
   <button id="t-ord" onclick="tab('ord')">Orden</button>
+  <button id="t-res" onclick="tab('res')">Resumen</button>
   <button id="t-reg" onclick="tab('reg')">Registros</button>
 </nav>
 <div id="toast" role="status"></div>
@@ -394,6 +420,7 @@ let ctx = lee(LS.ctx, {});
 let cfg = lee(LS.cfg, { surcos: 52, metros: 5 });
 let pos = null;
 let recientes = [];
+let resumen = [];
 let sincronizando = false;
 let cola = [];
 let guardando = false;
@@ -521,7 +548,7 @@ function programarBorrador() {
   borradorT = setTimeout(guardarBorrador, 300);
 }
 function leerBorrador() {
-  const tabAct = ['mon', 'cont', 'ord', 'reg'].find(k => !$('tab-' + k).hidden);
+  const tabAct = ['mon', 'cont', 'ord', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
   return { tab: tabAct, tipo: m.tipo, ev: m.ev, af: m.af, sev: m.sev, foto: m.foto,
     metodo: m.metodo, metros: m.metros, cats: m.cats, golpes: m.golpes, lecturas: m.lecturas, incTocado: m.incTocado,
     problema: $('problema').value, otro: $('otro').value, estadio: $('estadio').value, obsMon: $('obsMon').value,
@@ -1038,6 +1065,103 @@ function pintarReg() {
   $('listaReg').innerHTML = h;
 }
 
+/* ---------- resumen: semana, campo, lote, fecha y detalle ---------- */
+async function refrescarResumen(manual) {
+  if (!equipo || !apiLista() || !navigator.onLine) { if (manual) toast('Sin señal. Muestro el último resumen guardado.', true); return; }
+  try {
+    resumen = (await api('resumen')) || [];
+    dbSet('resumen', resumen).catch(() => {});
+    pintarResumen();
+    if (manual) toast('Resumen actualizado');
+  } catch (e) {
+    if (!claveRechazada(e) && (manual || !resumen.length)) toast('No se pudo actualizar el resumen', true);
+  }
+}
+const fechaDM = f => f.slice(8, 10) + '/' + f.slice(5, 7);
+/** Lunes de la semana de una fecha, como texto AAAA-MM-DD. */
+function lunesDe(f) {
+  const d = new Date(f + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+  return d.toISOString().slice(0, 10);
+}
+function etiquetaSemana(lunes) {
+  const fin = new Date(lunes + 'T12:00:00Z');
+  fin.setUTCDate(fin.getUTCDate() + 6);
+  return fechaDM(lunes) + ' al ' + fechaDM(fin.toISOString().slice(0, 10));
+}
+const agruparPor = (lista, clave) => lista.reduce((g, r) => { const k = clave(r); (g[k] = g[k] || []).push(r); return g; }, {});
+const contar = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+const hayNumero = v => v !== '' && v != null && isFinite(Number(v));
+/** Promedio del día por plaga: un punto sin esa plaga cuenta 0. La incidencia promedia los puntos donde se midió. */
+function resumenDia(filas) {
+  const puntos = new Set(filas.map(r => r.punto)).size;
+  const reales = filas.filter(r => r.metodo !== 'Sin presencia');
+  return Object.entries(agruparPor(reales, r => r.problema)).map(([problema, gr]) => {
+    const conteos = gr.filter(r => hayNumero(r.promedio));
+    const incid = gr.filter(r => !hayNumero(r.promedio) && hayNumero(r.incidencia));
+    const cats = Object.entries(agruparPor(conteos.filter(r => r.categoria), r => r.categoria))
+      .map(([c, x]) => ({ cat: c, prom: x.reduce((a, r) => a + Number(r.promedio), 0) / puntos }));
+    return { problema: problema, tipo: gr[0].tipo, hayConteo: conteos.length > 0, cats: cats,
+      promedio: conteos.reduce((a, r) => a + Number(r.promedio), 0) / puntos,
+      conPresencia: new Set(conteos.filter(r => Number(r.promedio) > 0).map(r => r.punto)).size,
+      incidencia: incid.length ? incid.reduce((a, r) => a + Number(r.incidencia), 0) / incid.length : null, nInc: incid.length };
+  }).sort((a, b) => b.promedio - a.promedio || (b.incidencia || 0) - (a.incidencia || 0));
+}
+function htmlLectura(l, puntos) {
+  const val = [];
+  if (l.hayConteo) val.push(fmt2(l.promedio) + ' por metro');
+  if (l.incidencia != null) val.push(fmt1(l.incidencia) + '% de incidencia');
+  const det = [];
+  if (l.cats.length) det.push(l.cats.map(c => c.cat + ': ' + fmt2(c.prom)).join(' · '));
+  if (l.hayConteo) det.push('Presente en ' + l.conPresencia + ' de ' + contar(puntos, 'punto', 'puntos'));
+  if (l.incidencia != null) det.push('Medida en ' + contar(l.nInc, 'punto', 'puntos'));
+  return '<div class="res-lec"><b>' + esc(l.problema) + '</b><div class="val">' + esc(val.join(' · ')) + '</div><div class="det">' + esc(det.join(' · ')) + '</div></div>';
+}
+function textoFila(r) {
+  if (r.metodo === 'Sin presencia') return 'Sin plagas';
+  const dato = hayNumero(r.promedio) ? fmt2(r.promedio) + ' por metro' : hayNumero(r.incidencia) ? fmt1(r.incidencia) + '% de incidencia' : '';
+  return r.problema + (r.categoria ? ' (' + r.categoria + ')' : '') + (dato ? ': ' + dato : '') + (r.severidad ? ', severidad ' + r.severidad : '');
+}
+function htmlPunto(filas, i) {
+  const r = filas[0];
+  const mapa = hayNumero(r.lat) && hayNumero(r.lng) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(r.lat + ',' + r.lng) + '" target="_blank" rel="noopener">Ver en el mapa</a>' : '';
+  const foto = filas.map(x => x.foto).find(u => /^https:/.test(u));
+  return '<div class="res-punto"><b>Punto ' + (i + 1) + ' · ' + esc(r.hora) + '</b>' + (r.usuario ? ' · ' + esc(r.usuario) : '') +
+    (r.estadio ? ' · ' + esc(r.estadio) : '') + filas.map(x => '<div>' + esc(textoFila(x)) + '</div>').join('') +
+    (r.obs ? '<div class="det">' + esc(r.obs) + '</div>' : '') + mapa + (foto ? '<a href="' + esc(foto) + '" target="_blank" rel="noopener">Ver foto</a>' : '') + '</div>';
+}
+function htmlDia(fecha, filas) {
+  const porPunto = Object.values(agruparPor(filas, r => r.punto)).sort((a, b) => String(a[0].hora).localeCompare(String(b[0].hora)));
+  const lecturas = resumenDia(filas);
+  const sin = !lecturas.length ? '<div class="res-lec"><b>Sin plagas</b></div>' : '';
+  return '<div class="res-dia"><h3>' + fechaDM(fecha) + ' <span>' + esc(filas[0].cultivo) + ' · ' + contar(porPunto.length, 'punto', 'puntos') + '</span></h3>' +
+    lecturas.map(l => htmlLectura(l, porPunto.length)).join('') + sin +
+    '<details><summary class="btn-link">Ver detalle de los puntos</summary>' + porPunto.map(htmlPunto).join('') + '</details></div>';
+}
+const ordenNatural = (a, b) => a.localeCompare(b, 'es', { numeric: true });
+function pintarResumen() {
+  const validas = resumen.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.fecha));
+  const semanas = [...new Set(validas.map(r => lunesDe(r.fecha)))].sort().reverse();
+  const elegida = semanas.includes($('resSemana').value) ? $('resSemana').value : semanas[0];
+  $('resSemana').innerHTML = semanas.map(s => '<option value="' + s + '">' + etiquetaSemana(s) + '</option>').join('');
+  if (!semanas.length) { $('resLista').innerHTML = '<p class="vacio">Todavía no hay monitoreos en las últimas 10 semanas.</p>'; return; }
+  $('resSemana').value = elegida;
+  const campos = agruparPor(validas.filter(r => lunesDe(r.fecha) === elegida), r => r.campo);
+  const nombres = Object.keys(campos).sort(ordenNatural);
+  $('resLista').innerHTML = nombres.map(c => {
+    const lotes = agruparPor(campos[c], r => r.lote);
+    const ids = Object.keys(lotes).sort(ordenNatural);
+    return '<details class="res-grupo"' + (nombres.length === 1 ? ' open' : '') + '><summary>' + esc(c) + ' <span>' + contar(ids.length, 'lote', 'lotes') + ' · ' +
+      contar(new Set(campos[c].map(r => r.punto)).size, 'punto', 'puntos') + '</span></summary><div class="dentro">' +
+      ids.map(l => {
+        const dias = agruparPor(lotes[l], r => r.fecha);
+        const fechas = Object.keys(dias).sort().reverse();
+        return '<details class="res-grupo res-lote"><summary>' + esc(l) + ' <span>' + fechas.map(fechaDM).join(', ') + '</span></summary><div class="dentro">' +
+          fechas.map(f => htmlDia(f, dias[f])).join('') + '</div></details>';
+      }).join('') + '</div></details>';
+  }).join('');
+}
+
 /* ---------- mapa y detección del lote ---------- */
 let mapa = null, capaLotes = null, marcador = null;
 function ptEnRing(x, y, ring) {
@@ -1374,12 +1498,13 @@ const guardarOrden = unaVez(async () => {
 
 /* ---------- pestañas e inicio ---------- */
 function tab(n) {
-  ['mon', 'cont', 'ord', 'reg'].forEach(k => { $('tab-' + k).hidden = k !== n; $('t-' + k).classList.toggle('on', k === n); });
-  $('ctxwrap').hidden = n === 'reg';
+  ['mon', 'cont', 'ord', 'res', 'reg'].forEach(k => { $('tab-' + k).hidden = k !== n; $('t-' + k).classList.toggle('on', k === n); });
+  $('ctxwrap').hidden = n === 'reg' || n === 'res';
   $('loteWrap').hidden = n === 'ord';
   $('gpsCard').hidden = n === 'ord';
   if (n === 'ord') abrirOrden();
   if (n === 'reg') { pintarReg(); refrescarRegistros(); pintarCfg(); }
+  if (n === 'res') { pintarResumen(); refrescarResumen(); }
   window.scrollTo(0, 0);
 }
 async function cargarDatos() {
@@ -1403,7 +1528,8 @@ function actualizarTodo(manual, forzar) {
 }
 async function init() {
   try {
-    const [d, q, r] = await Promise.all([dbGet('datos'), dbTx('cola', 'readonly', o => o.getAll()), dbGet('recientes')]);
+    const [d, q, r, rs] = await Promise.all([dbGet('datos'), dbTx('cola', 'readonly', o => o.getAll()), dbGet('recientes'), dbGet('resumen')]);
+    resumen = rs || [];
     if (d) datos = d;
     cola = q || [];
     recientes = r || [];
