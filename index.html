@@ -147,6 +147,10 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
 #setup{padding:14px;max-width:640px;margin:0 auto}
 #setupMsg{margin:0 0 6px}
 .cfgdato{margin:0 0 6px}
+.seg.chico button{padding:6px 2px;font-size:15px}
+.res-tot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.res-tot div{padding:10px 12px;border:2px solid var(--field);border-radius:10px;background:#EAF2EC;font-size:15px;color:var(--mute)}
+.res-tot b{display:block;font:700 26px/1.1 var(--head);color:var(--field-d)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 </head>
@@ -386,13 +390,35 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
 
   <!-- RESUMEN -->
   <div id="tab-res" class="tab" hidden>
+    <div class="seg chico" id="segRes" style="margin-bottom:14px">
+      <button data-v="mon" class="on" onclick="setVistaRes('mon')">Monitoreo</button>
+      <button data-v="lab" onclick="setVistaRes('lab')">Labores</button>
+      <button data-v="lot" onclick="setVistaRes('lot')">Lotes</button>
+      <button data-v="ins" onclick="setVistaRes('ins')">Insumos</button>
+    </div>
+    <div id="resMon">
     <section class="card">
       <h2>Monitoreos de la semana</h2>
       <label for="resSemana">Semana</label>
       <select id="resSemana" onchange="pintarResumen()"></select>
     </section>
     <div id="resLista"></div>
-    <button class="btn" style="width:100%" onclick="refrescarResumen(true)">Actualizar resumen</button>
+    </div>
+    <div id="resOrd" hidden>
+      <section class="card">
+        <div class="grid2">
+          <div><label for="resCamp">Campaña</label><select id="resCamp" onchange="pintarDetalle()"></select></div>
+          <div><label for="resCampo">Campo</label><select id="resCampo" onchange="pintarDetalle()"></select></div>
+        </div>
+        <div class="seg" id="segEst" style="margin-top:12px">
+          <button data-v="real" class="on" onclick="setEstRes('real')">Realizadas</button>
+          <button data-v="todas" onclick="setEstRes('todas')">Con pendientes</button>
+        </div>
+      </section>
+      <div id="resOrdTot" class="res-tot"></div>
+      <div id="resOrdDet"></div>
+    </div>
+    <button class="btn" style="width:100%" onclick="actualizarResumen()">Actualizar resumen</button>
   </div>
 
   <!-- REGISTROS -->
@@ -1025,7 +1051,7 @@ async function sincronizar(manual) {
   sincronizando = false;
   actualizarEstado();
   if (err && !claveRechazada(err) && manual) toast('No se pudo enviar: ' + err.message, true);
-  if (enviados) { refrescarRegistros(); refrescarOrdenes(); if (!err) toast('Enviado a la hoja'); }
+  if (enviados) { refrescarRegistros(); refrescarOrdenes(); refrescarDetalle(); if (!err) toast('Enviado a la hoja'); }
 }
 function actualizarEstado() {
   const n = cola.length, on = navigator.onLine;
@@ -1091,6 +1117,109 @@ async function refrescarResumen(manual) {
   } catch (e) {
     if (!claveRechazada(e) && (manual || !resumen.length)) toast('No se pudo actualizar el resumen: ' + e.message, true);
   }
+}
+/* ---------- resúmenes de labores, lotes e insumos ---------- */
+let detalle = { filas: [], costos: false }, resVista = 'mon', resEstado = 'real';
+function setVistaRes(v) {
+  resVista = v;
+  document.querySelectorAll('#segRes button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('resMon').hidden = v !== 'mon';
+  $('resOrd').hidden = v === 'mon';
+  if (v !== 'mon') { pintarDetalle(); refrescarDetalle(); }
+}
+function setEstRes(v) {
+  resEstado = v;
+  document.querySelectorAll('#segEst button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  pintarDetalle();
+}
+function actualizarResumen() {
+  if (resVista === 'mon') refrescarResumen(true); else refrescarDetalle(true);
+}
+async function refrescarDetalle(manual) {
+  if (!equipo || !apiLista() || !navigator.onLine) { if (manual) toast('Sin señal. Muestro el último resumen guardado.', true); return; }
+  try {
+    detalle = (await api('detalle', { claveOrdenes: lee(LS.clave, '') })) || detalle;
+    dbSet('detalle', detalle).catch(() => {});
+    if (!$('tab-res').hidden && resVista !== 'mon') pintarDetalle();
+    if (manual) toast('Resumen actualizado');
+  } catch (e) {
+    if (!claveRechazada(e) && manual) toast('No se pudo actualizar el resumen: ' + e.message, true);
+  }
+}
+const sumar = (filas, f) => filas.reduce((a, r) => a + (hayNumero(r[f]) ? Number(r[f]) : 0), 0);
+const fmtPesos = n => '$ ' + fmt0(n);
+const contarOrdenes = filas => contar(new Set(filas.map(r => r.nro)).size, 'orden', 'órdenes');
+const conCosto = t => detalle.costos ? ' · ' + fmtPesos(t) : '';
+const costoDe = filas => sumar(filas, 'costoLabor') + sumar(filas, 'costoProd');
+function opcionesRes(sel, valores, todos) {
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">' + todos + '</option>' + valores.map(v => '<option>' + esc(v) + '</option>').join('');
+  if (valores.includes(prev)) sel.value = prev;
+}
+/** Una línea por insumo, sumada en L o kg. */
+function lineasInsumos(filas) {
+  return Object.entries(agruparPor(filas.filter(r => r.producto), r => r.producto + '|' + r.unidad)).sort((a, b) => ordenNatural(a[0], b[0])).map(([k, gr]) => ({
+    producto: gr[0].producto, tipo: gr[0].tipo, unidad: gr[0].unidad, cant: sumar(gr, 'cant'), costo: sumar(gr, 'costoProd'), filas: gr }));
+}
+const textoCant = i => fmt1(i.cant) + ' ' + i.unidad;
+/** Rinde de las filas de cosecha con producción cargada. */
+function textoRinde(filas) {
+  const c = filas.filter(r => hayNumero(r.kg) && Number(r.kg) > 0);
+  if (!c.length) return '';
+  const kg = sumar(c, 'kg'), has = sumar(c, 'has');
+  return fmt0(kg) + ' kg · ' + (has ? fmt0(kg / has) + ' kg/ha' : '');
+}
+function lineaLote(lote, filas, detalleTxt) {
+  return '<div class="res-lec"><b>' + esc(lote) + '</b><div class="val">' + esc(detalleTxt) + '</div></div>';
+}
+function grupoCampos(filas, abrir, resumenCampo, htmlLotes) {
+  const campos = agruparPor(filas, r => r.campo), nombres = Object.keys(campos).sort(ordenNatural);
+  return nombres.map(c => '<details class="res-grupo res-lote"' + (abrir || nombres.length === 1 ? ' open' : '') + '><summary>' + esc(c) + ' <span>' + esc(resumenCampo(campos[c])) + '</span></summary><div class="dentro">' +
+    Object.entries(agruparPor(campos[c], r => r.lote)).sort((a, b) => ordenNatural(a[0], b[0])).map(([l, gr]) => htmlLotes(l, gr)).join('') + '</div></details>').join('');
+}
+function vistaLabores(filas) {
+  const labores = agruparPor(filas, r => r.labor);
+  $('resOrdTot').innerHTML = '<div><b>' + fmt1(sumar(filas, 'has')) + '</b>ha trabajadas</div><div><b>' + new Set(filas.map(r => r.nro)).size + '</b>órdenes</div>' +
+    (detalle.costos ? '<div style="grid-column:1/3"><b>' + fmtPesos(sumar(filas, 'costoLabor')) + '</b>costo de labores</div>' : '');
+  return Object.keys(labores).sort(ordenNatural).map(l => {
+    const gr = labores[l], rinde = textoRinde(gr);
+    return '<details class="res-grupo"><summary>' + esc(l) + ' <span>' + fmt1(sumar(gr, 'has')) + ' ha · ' + contarOrdenes(gr) + conCosto(sumar(gr, 'costoLabor')) + (rinde ? ' · ' + esc(rinde) : '') + '</span></summary><div class="dentro">' +
+      grupoCampos(gr, false, x => fmt1(sumar(x, 'has')) + ' ha', (lote, y) => {
+        const r = textoRinde(y);
+        return lineaLote(lote, y, fmt1(sumar(y, 'has')) + ' ha · ' + contarOrdenes(y) + conCosto(sumar(y, 'costoLabor')) + (r ? ' · ' + r : ''));
+      }) + '</div></details>';
+  }).join('');
+}
+function vistaLotes(filas) {
+  $('resOrdTot').innerHTML = '<div><b>' + new Set(filas.map(r => r.campo + '|' + r.lote)).size + '</b>lotes</div><div><b>' + fmt1(sumar(filas, 'has')) + '</b>ha trabajadas</div>' +
+    (detalle.costos ? '<div style="grid-column:1/3"><b>' + fmtPesos(costoDe(filas)) + '</b>costo total</div>' : '');
+  return grupoCampos(filas, true, x => contar(new Set(x.map(r => r.lote)).size, 'lote', 'lotes') + conCosto(costoDe(x)), (lote, gr) => {
+    const labs = Object.entries(agruparPor(gr, r => r.labor)).sort((a, b) => ordenNatural(a[0], b[0])).map(([l, x]) => {
+      const fechas = [...new Set(x.map(r => r.fechaReal || r.fecha))].sort().map(fechaDM).join(', ');
+      const r = textoRinde(x);
+      return '<div class="res-lec"><b>' + esc(l) + '</b><div class="val">' + fmt1(sumar(x, 'has')) + ' ha' + esc(conCosto(sumar(x, 'costoLabor'))) + (r ? ' · ' + esc(r) : '') + '</div><div class="det">' + esc(fechas) + '</div></div>';
+    }).join('');
+    const ins = lineasInsumos(gr).map(i => '<div class="res-lec"><b>' + esc(i.producto) + '</b><div class="val">' + esc(textoCant(i) + conCosto(i.costo)) + '</div></div>').join('');
+    return '<details class="res-grupo res-lote"><summary>' + esc(lote) + ' <span>' + fmt1(sumar(gr, 'has')) + ' ha' + esc(conCosto(costoDe(gr))) + '</span></summary><div class="dentro">' +
+      '<div class="res-dia"><h3>Labores</h3>' + labs + '</div>' + (ins ? '<div class="res-dia"><h3>Insumos</h3>' + ins + '</div>' : '') + '</div></details>';
+  });
+}
+function vistaInsumos(filas) {
+  const lista = lineasInsumos(filas);
+  $('resOrdTot').innerHTML = '<div><b>' + lista.length + '</b>insumos</div>' + (detalle.costos ? '<div><b>' + fmtPesos(sumar(filas, 'costoProd')) + '</b>costo total</div>' : '');
+  return lista.map(i => '<details class="res-grupo"><summary>' + esc(i.producto) + ' <span>' + esc((i.tipo ? i.tipo + ' · ' : '') + textoCant(i) + conCosto(i.costo)) + '</span></summary><div class="dentro">' +
+    grupoCampos(i.filas, false, x => fmt1(sumar(x, 'cant')) + ' ' + i.unidad + conCosto(sumar(x, 'costoProd')),
+      (lote, y) => lineaLote(lote, y, fmt1(sumar(y, 'cant')) + ' ' + i.unidad + conCosto(sumar(y, 'costoProd')))) + '</div></details>').join('');
+}
+function pintarDetalle() {
+  const todas = detalle.filas || [];
+  opcionesRes($('resCamp'), [...new Set(todas.map(r => r.campania))].filter(Boolean).sort().reverse(), 'Todas');
+  opcionesRes($('resCampo'), [...new Set(todas.map(r => r.campo))].filter(Boolean).sort(ordenNatural), 'Todos');
+  const camp = $('resCamp').value, campo = $('resCampo').value;
+  const filas = todas.filter(r => (!camp || r.campania === camp) && (!campo || r.campo === campo) && (resEstado === 'todas' || r.estado === 'Realizada'));
+  const html = !filas.length ? '' : resVista === 'lab' ? vistaLabores(filas) : resVista === 'lot' ? vistaLotes(filas) : vistaInsumos(filas);
+  if (!filas.length) $('resOrdTot').innerHTML = '';
+  $('resOrdDet').innerHTML = html || '<p class="vacio">' + (resEstado === 'real' ? 'No hay órdenes realizadas con estos filtros. Marcalas como realizadas o elegí Con pendientes.' : resVista === 'ins' ? 'No hay insumos con estos filtros.' : 'No hay órdenes con estos filtros.') + '</p>';
 }
 const fechaDM = f => f.slice(8, 10) + '/' + f.slice(5, 7);
 /** Lunes de la semana de una fecha, como texto AAAA-MM-DD. */
@@ -1662,7 +1791,7 @@ function tab(n) {
   $('gpsCard').hidden = n === 'ord';
   if (n === 'ord') abrirOrden();
   if (n === 'reg') { pintarReg(); refrescarRegistros(); pintarCfg(); }
-  if (n === 'res') { pintarResumen(); refrescarResumen(); }
+  if (n === 'res') { pintarResumen(); refrescarResumen(); if (resVista !== 'mon') { pintarDetalle(); refrescarDetalle(); } }
   window.scrollTo(0, 0);
 }
 async function cargarDatos() {
@@ -1689,6 +1818,7 @@ async function init() {
   try {
     const [d, q, r, rs] = await Promise.all([dbGet('datos'), dbTx('cola', 'readonly', o => o.getAll()), dbGet('recientes'), dbGet('resumen')]);
     ordenes = (await dbGet('ordenes')) || [];
+    detalle = (await dbGet('detalle')) || detalle;
     resumen = rs || [];
     if (d) datos = d;
     cola = q || [];
