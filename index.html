@@ -333,15 +333,28 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
     </section>
   </div>
 
-  <!-- ORDEN DE APLICACIÓN -->
+  <!-- ORDEN DE TRABAJO -->
   <div id="tab-ord" class="tab" hidden>
     <section class="card" id="ordClave">
-      <h2>Órdenes de aplicación</h2>
+      <h2>Órdenes de trabajo</h2>
       <p id="ordClaveMsg" style="margin:0 0 10px">Ingresá la clave para crear órdenes.</p>
       <input id="claveIn" type="password" autocomplete="off" placeholder="Clave">
       <button class="btn-main" onclick="entrarClave()">Entrar</button>
     </section>
     <div id="ordForm" hidden>
+      <div class="seg" id="segOrd" style="margin-bottom:14px">
+        <button data-v="nueva" class="on" onclick="setVistaOrd('nueva')">Nueva</button>
+        <button data-v="pend" onclick="setVistaOrd('pend')">Pendientes</button>
+        <button data-v="real" onclick="setVistaOrd('real')">Realizadas</button>
+      </div>
+      <div id="ordLista" hidden>
+        <div id="listaOrd"></div>
+        <button class="btn" style="width:100%" onclick="refrescarOrdenes(true)">Actualizar órdenes</button>
+      </div>
+      <div id="ordNueva">
+      <section class="card">
+        <label for="ordLabor" style="margin-top:0">Labor</label><select id="ordLabor" onchange="cambiarLabor()"></select>
+      </section>
       <section class="card">
         <h2>Lotes y hectáreas</h2>
         <div id="ordLotes"></div>
@@ -350,13 +363,13 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
       <section class="card">
         <h2>Máquina</h2>
         <label for="ordMaq">Máquina y contratista</label><select id="ordMaq"></select>
-        <div class="grid2" style="margin-top:12px">
+        <div class="grid2" id="ordCaldoWrap" style="margin-top:12px">
           <div><label for="ordCaldo">Caldo (L/ha)</label><input id="ordCaldo" type="number" inputmode="decimal" min="0" oninput="pintarOrd()"></div>
           <div><label>Caldo total</label><div class="otot" id="ordCaldoTot" style="margin-top:10px">-</div></div>
         </div>
       </section>
-      <section class="card">
-        <h2>Productos</h2>
+      <section class="card" id="ordInsumos">
+        <h2 id="ordInsTit">Productos</h2>
         <div id="ordProds"></div>
         <button class="btn" id="btnAddProd" style="width:100%" onclick="agregarProd()">Agregar producto</button>
       </section>
@@ -367,6 +380,7 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
         <button class="btn-main" onclick="guardarOrden()">Generar orden y PDF</button>
         <button class="btn-link" onclick="salirClave()">Cerrar sesión de órdenes</button>
       </section>
+      </div>
     </div>
   </div>
 
@@ -553,7 +567,7 @@ function leerBorrador() {
     metodo: m.metodo, metros: m.metros, cats: m.cats, golpes: m.golpes, lecturas: m.lecturas, incTocado: m.incTocado,
     problema: $('problema').value, otro: $('otro').value, estadio: $('estadio').value, obsMon: $('obsMon').value,
     momento: st.momento, muestras: st.muestras, conteo: $('conteo').value, dens: $('dens').value, obsSt: $('obsSt').value,
-    ord: { lotes: ordLotes, campo: ordCampo, prods: ordProds, maq: $('ordMaq').value, caldo: $('ordCaldo').value,
+    ord: { labor: $('ordLabor').value, lotes: ordLotes, campo: ordCampo, prods: ordProds, maq: $('ordMaq').value, caldo: $('ordCaldo').value,
            resp: $('ordResp').value, obs: $('ordObs').value, mapa: $('ordMapa').checked } };
 }
 function guardarBorrador() {
@@ -581,7 +595,7 @@ async function restaurarBorrador() {
     ordLotes = b.ord.lotes || {}; ordCampo = b.ord.campo || ''; ordProds = b.ord.prods || [];
     $('ordCaldo').value = b.ord.caldo || ''; $('ordResp').value = b.ord.resp || ''; $('ordObs').value = b.ord.obs || '';
     $('ordMapa').checked = b.ord.mapa !== false;
-    borradorMaq = b.ord.maq || '';
+    borradorMaq = b.ord.maq || ''; borradorLabor = b.ord.labor || '';
   }
   pintarInc(); pintarStand(); pintarMetodo(); pintarLecturas();
   if (b.tab) tab(b.tab);
@@ -1011,7 +1025,7 @@ async function sincronizar(manual) {
   sincronizando = false;
   actualizarEstado();
   if (err && !claveRechazada(err) && manual) toast('No se pudo enviar: ' + err.message, true);
-  if (enviados) { refrescarRegistros(); if (!err) toast('Enviado a la hoja'); }
+  if (enviados) { refrescarRegistros(); refrescarOrdenes(); if (!err) toast('Enviado a la hoja'); }
 }
 function actualizarEstado() {
   const n = cola.length, on = navigator.onLine;
@@ -1038,11 +1052,12 @@ function datoMon(r) {
   return fmt1(r.incidencia) + '% de incidencia' + (r.severidad ? ', severidad ' + esc(r.severidad) : '');
 }
 function fila(r, pend) {
+  if (r.tabla === 'estado') return '<div class="fila pend"><div class="fila-top"><b>' + esc(r.nro) + '</b><span>' + esc(r.labor) + '</span></div><div>Pasa a ' + esc(r.estado.toLowerCase()) + '</div></div>';
   if (r.tabla === 'orden') {
     const lotes = Array.isArray(r.lotes) ? r.lotes.map(l => l.lote).join(', ') : r.lote;
     const has = Array.isArray(r.lotes) ? r.lotes.reduce((a, l) => a + (Number(l.has) || 0), 0) : r.has;
     const pdf = r.pdf && /^https:/.test(r.pdf) ? '<a class="pdflink" href="' + esc(r.pdf) + '" target="_blank" rel="noopener">Abrir PDF</a> &nbsp; <button class="btn-link" data-u="' + esc(r.pdf) + '" data-t="' + esc(r.nro) + '" onclick="compartirPdf(this)">Compartir</button>' : (r.pdf ? '<div class="dato">' + esc(r.pdf) + '</div>' : (pend ? '' : ''));
-    return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.nro || 'Orden') + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>Orden de aplicación: ' + esc(lotes) + '</div><div class="dato">' + fmt1(has) + ' ha</div>' + pdf + '</div>';
+    return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.nro || 'Orden') + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>Orden de ' + esc((r.labor || 'aplicación').toLowerCase()) + (r.estado === 'Realizada' ? ' (realizada)' : '') + ': ' + esc(lotes) + '</div><div class="dato">' + fmt1(has) + ' ha</div>' + pdf + '</div>';
   }
   const titulo = r.tabla === 'punto' ? 'Punto de monitoreo'
     : r.tabla === 'mon' ? esc(r.tipo) + ': ' + esc(r.problema) : 'Conteo de ' + (r.momento === 'Siembra' ? 'siembra' : 'emergencia');
@@ -1345,7 +1360,141 @@ async function mostrarNdvi() {
 }
 
 /* ---------- órdenes de aplicación ---------- */
-let ordLotes = {}, ordCampo = '', ordProds = [], borradorMaq = '';
+let ordLotes = {}, ordCampo = '', ordProds = [], borradorMaq = '', borradorLabor = '';
+let ordenes = [], ordVista = 'nueva', ordAbierta = '', ordKg = {};
+const LABORES_BASE = ['Fumigación', 'Siembra', 'Fertilización', 'Carpida', 'Cosecha'];
+const LABORES_CON_INSUMOS = ['Fumigación', 'Siembra', 'Fertilización'];
+const laborActual = () => $('ordLabor').value || 'Fumigación';
+function armarLabores() {
+  const lista = datos.catalogo.Labor && datos.catalogo.Labor.length ? datos.catalogo.Labor : LABORES_BASE;
+  const prev = $('ordLabor').value || borradorLabor;
+  $('ordLabor').innerHTML = lista.map(l => '<option>' + esc(l) + '</option>').join('');
+  if (lista.includes(prev)) $('ordLabor').value = prev;
+  ajustarLabor();
+}
+/** Muestra solo lo que usa cada labor. */
+function ajustarLabor() {
+  const l = laborActual();
+  $('ordCaldoWrap').hidden = l !== 'Fumigación';
+  $('ordInsumos').hidden = l === 'Cosecha';
+  $('ordInsTit').textContent = l === 'Fumigación' ? 'Productos' : LABORES_CON_INSUMOS.includes(l) ? 'Insumos' : 'Insumos (opcional)';
+}
+function cambiarLabor() { armarMaquinas(); ajustarLabor(); pintarOrd(); }
+function aplicarVistaOrd() {
+  document.querySelectorAll('#segOrd button').forEach(b => b.classList.toggle('on', b.dataset.v === ordVista));
+  $('ordNueva').hidden = ordVista !== 'nueva';
+  $('ordLista').hidden = ordVista === 'nueva';
+  $('ctxwrap').hidden = ordVista !== 'nueva';
+  if (ordVista !== 'nueva') pintarOrdenes();
+}
+function setVistaOrd(v) {
+  ordVista = v;
+  ordAbierta = '';
+  aplicarVistaOrd();
+  if (v !== 'nueva') refrescarOrdenes();
+  window.scrollTo(0, 0);
+}
+async function refrescarOrdenes(manual) {
+  if (!equipo || !apiLista() || !navigator.onLine) { if (manual) toast('Sin señal. Muestro las últimas órdenes guardadas.', true); return; }
+  try {
+    ordenes = (await api('ordenes')) || [];
+    cola.filter(r => r.tabla === 'estado').forEach(aplicarEstadoLocal);
+    dbSet('ordenes', ordenes).catch(() => {});
+    if (!$('ordLista').hidden && !ordAbierta) pintarOrdenes();
+    if (manual) toast('Órdenes actualizadas');
+  } catch (e) {
+    if (!claveRechazada(e) && manual) toast('No se pudieron actualizar las órdenes: ' + e.message, true);
+  }
+}
+function aplicarEstadoLocal(r) {
+  const o = ordenes.find(x => x.id === r.orden);
+  if (!o) return;
+  const kgs = {};
+  (r.produccion || []).forEach(p => { kgs[p.lote] = p.kg; });
+  o.estado = r.estado;
+  o.fechaReal = r.estado === 'Realizada' ? r.fechaReal : '';
+  o.lotes.forEach(l => { if (r.estado === 'Realizada' && kgs[l.lote] > 0) l.kg = kgs[l.lote]; else delete l.kg; });
+  const total = o.lotes.reduce((a, l) => a + (l.kg || 0), 0);
+  o.prod = total || '';
+  o.rinde = total ? Math.round(total / o.lotes.reduce((a, l) => a + (l.kg ? Number(l.has) || 0 : 0), 0)) : '';
+}
+function tarjetaOrden(o) {
+  const lotes = o.lotes.map(l => esc(l.lote) + ' (' + fmt1(l.has) + ' ha' + (l.kg ? ', ' + fmt0(l.kg) + ' kg, ' + fmt0(l.kg / l.has) + ' kg/ha' : '') + ')').join('<br>');
+  const pdf = /^https:/.test(o.pdf) ? '<a class="pdflink" href="' + esc(o.pdf) + '" target="_blank" rel="noopener">Abrir PDF</a> &nbsp; <button class="btn-link" data-u="' + esc(o.pdf) + '" data-t="' + esc(o.nro) + '" onclick="compartirPdf(this)">Compartir</button>' : '';
+  let pie;
+  if (ordAbierta === o.id) {
+    pie = '<label for="rfFecha">Fecha en que se hizo</label><input id="rfFecha" type="date" value="' + esc(ordKg.fecha) + '">';
+    if (o.labor === 'Cosecha') {
+      pie += o.lotes.map((l, i) => '<label for="rk' + i + '">Producción de ' + esc(l.lote) + ' (kg)</label><input id="rk' + i + '" type="number" inputmode="decimal" min="0" data-l="' + esc(l.lote) + '" value="' + esc(ordKg[l.lote] || '') + '" oninput="setKg(this)">').join('');
+      pie += '<div class="otot" id="rfRinde"></div>';
+    }
+    pie += '<button class="btn-main" onclick="confirmarRealizada(\'' + esc(o.id) + '\')">Confirmar realizada</button><button class="btn-link" onclick="cerrarRealizar()">Cancelar</button>';
+  } else if (o.estado === 'Realizada') {
+    pie = '<div class="dato">Realizada el ' + esc(fechaCorta(o.fechaReal || o.fecha)) + (o.prod ? ' · ' + fmt0(o.prod) + ' kg · ' + fmt0(o.rinde) + ' kg/ha' : '') + '</div>' +
+      '<button class="btn-link" onclick="volverPendiente(\'' + esc(o.id) + '\')">Volver a pendiente</button>';
+  } else {
+    pie = '<button class="btn" style="width:100%;margin-top:8px" onclick="abrirRealizar(\'' + esc(o.id) + '\')">Marcar realizada</button>';
+  }
+  return '<div class="fila"><div class="fila-top"><b>' + esc(o.nro) + '</b><span>' + esc(o.labor) + '</span><time>' + esc(fechaCorta(o.fecha)) + '</time></div>' +
+    '<div>' + esc(o.campo) + (o.cultivo ? ' · ' + esc(o.cultivo) : '') + '</div><div>' + lotes + '</div>' +
+    '<div class="dato">' + fmt1(o.has) + ' ha · ' + esc(o.maquina) + (o.contratista ? ' · ' + esc(o.contratista) : '') + '</div>' + pdf + pie + '</div>';
+}
+function pintarOrdenes() {
+  const real = ordVista === 'real';
+  const lista = ordenes.filter(o => (o.estado === 'Realizada') === real);
+  const sinEnviar = real ? [] : cola.filter(r => r.tabla === 'orden');
+  $('listaOrd').innerHTML = sinEnviar.map(r => fila(r, true)).join('') + lista.map(tarjetaOrden).join('') +
+    (lista.length || sinEnviar.length ? '' : '<p class="vacio">' + (real ? 'Todavía no hay órdenes realizadas.' : 'No hay órdenes pendientes.') + '</p>');
+  pintarRindeRf();
+}
+function abrirRealizar(id) {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  ordKg = { fecha: d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) };
+  ordAbierta = id;
+  pintarOrdenes();
+}
+function cerrarRealizar() { ordAbierta = ''; pintarOrdenes(); }
+function setKg(el) { ordKg[el.dataset.l] = num(el.value); pintarRindeRf(); }
+function pintarRindeRf() {
+  const o = ordenes.find(x => x.id === ordAbierta), t = $('rfRinde');
+  if (!o || !t) return;
+  const con = o.lotes.filter(l => ordKg[l.lote] > 0);
+  const kg = con.reduce((a, l) => a + ordKg[l.lote], 0), has = con.reduce((a, l) => a + (Number(l.has) || 0), 0);
+  t.textContent = kg && has ? 'Rinde: ' + fmt0(kg / has) + ' kg/ha' : '';
+}
+async function cambiarEstado(o, estado, fechaReal, produccion) {
+  const r = { id: nuevoId(), tabla: 'estado', orden: o.id, nro: o.nro, labor: o.labor, estado: estado,
+              fechaReal: fechaReal, produccion: produccion, clave: lee(LS.clave, '') };
+  aplicarEstadoLocal(r);
+  dbSet('ordenes', ordenes).catch(() => {});
+  ordAbierta = '';
+  const ok = await encolar(r);
+  pintarOrdenes();
+  return ok;
+}
+async function confirmarRealizada(id) {
+  if (guardando) return;
+  const o = ordenes.find(x => x.id === id);
+  if (!o) return;
+  const fecha = $('rfFecha').value;
+  if (!fecha) return toast('Indicá la fecha', true);
+  const prod = [];
+  if (o.labor === 'Cosecha') {
+    for (const l of o.lotes) {
+      if (!(ordKg[l.lote] > 0)) return toast('Falta la producción de ' + l.lote, true);
+      prod.push({ lote: l.lote, kg: ordKg[l.lote] });
+    }
+  }
+  guardando = true;
+  try { if (await cambiarEstado(o, 'Realizada', fecha, prod)) toast(o.nro + ' realizada'); } finally { guardando = false; }
+}
+async function volverPendiente(id) {
+  if (guardando) return;
+  const o = ordenes.find(x => x.id === id);
+  if (!o || !confirm('¿Volver ' + o.nro + ' a pendiente?' + (o.prod ? ' Se borra la producción cargada.' : ''))) return;
+  guardando = true;
+  try { if (await cambiarEstado(o, 'Pendiente', '', [])) toast(o.nro + ' pendiente'); } finally { guardando = false; }
+}
 const PROD_VACIO = () => ({ idx: '', dosis: '', total: '', modo: 'dosis' });
 const r3 = n => String(Math.round(n * 1000) / 1000);
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
@@ -1364,6 +1513,8 @@ function abrirOrden() {
     $('ordClaveMsg').textContent = datos.hayClave === false ? 'Todavía no hay clave definida. En la planilla: menú Monitoreo > Definir clave de órdenes.' : 'Ingresá la clave para crear órdenes.';
     return;
   }
+  aplicarVistaOrd();
+  armarLabores();
   if (!$('ordResp').value) $('ordResp').value = lee(LS.resp, '') || (equipo ? equipo.nombre : '');
   armarMaquinas();
   armarOrdLotes();
@@ -1384,15 +1535,21 @@ async function entrarClave() {
 }
 function salirClave() {
   try { localStorage.removeItem(LS.clave); } catch (e) {}
+  ordVista = 'nueva';
+  $('ctxwrap').hidden = false;
   abrirOrden();
 }
 function armarMaquinas() {
-  const mq = (datos.maquinas && datos.maquinas.length) ? datos.maquinas : [];
+  const lab = laborActual();
+  const todas = (datos.maquinas || []).map((x, i) => Object.assign({ i: i }, x));
+  // Si esa máquina y contratista tienen fila propia para la labor, no se muestra además la general
+  const propia = x => todas.some(y => y.labor === lab && y.maquina === x.maquina && y.contratista === x.contratista);
+  const mq = todas.filter(x => x.labor === lab || (!x.labor && !propia(x)));
   const prev = $('ordMaq').value || borradorMaq;
   $('ordMaq').innerHTML = mq.length
-    ? mq.map((x, i) => '<option value="' + i + '">' + esc(x.maquina + (x.contratista ? ' - ' + x.contratista : '')) + '</option>').join('')
-    : '<option value="">Cargá máquinas en la hoja Maquinas</option>';
-  if (prev !== '' && mq[prev]) $('ordMaq').value = prev;
+    ? mq.map(x => '<option value="' + x.i + '">' + esc(x.maquina + (x.contratista ? ' - ' + x.contratista : '')) + '</option>').join('')
+    : '<option value="">Cargá máquinas para esta labor en la hoja Maquinas</option>';
+  if (mq.some(x => String(x.i) === String(prev))) $('ordMaq').value = prev;
 }
 function armarOrdLotes() {
   const campo = $('campo').value;
@@ -1467,7 +1624,8 @@ const guardarOrden = unaVez(async () => {
   const lotes = Object.keys(ordLotes).filter(k => ordLotes[k].on && ordLotes[k].has > 0).map(k => ({ lote: k, has: ordLotes[k].has }));
   if (!lotes.length) return toast('Elegí al menos un lote con hectáreas', true);
   const prods = [];
-  for (const r of ordProds) {
+  const labor = laborActual();
+  for (const r of labor === 'Cosecha' ? [] : ordProds) {
     const p = (datos.productos || [])[r.idx];
     const usaTotal = r.modo === 'total';
     const hasT = hasTotal();
@@ -1477,7 +1635,7 @@ const guardarOrden = unaVez(async () => {
     if (!dosis) return toast('Falta la dosis o la cantidad de ' + p.nombre, true);
     prods.push({ nombre: p.nombre, tipo: p.tipo, form: p.form, unidad: p.unidad, dosis: dosis, total: usaTotal ? num(r.total) : '' });
   }
-  if (!prods.length) return toast('Agregá al menos un producto', true);
+  if (!prods.length && LABORES_CON_INSUMOS.includes(labor)) return toast('Agregá al menos un producto', true);
   const resp = $('ordResp').value.trim();
   if (!resp) return toast('Indicá el responsable', true);
   const mq = (datos.maquinas || [])[$('ordMaq').value];
@@ -1485,7 +1643,7 @@ const guardarOrden = unaVez(async () => {
   escribe(LS.resp, resp);
   const r = Object.assign({ id: nuevoId(), tabla: 'orden' }, cuando(), {
     campania: ctx.campania, campo: ctx.campo, cultivo: ctx.cultivo, lotes: lotes,
-    maquina: mq.maquina, contratista: mq.contratista, caldo: num($('ordCaldo').value),
+    maquina: mq.maquina, contratista: mq.contratista, caldo: labor === 'Fumigación' ? num($('ordCaldo').value) : 0, labor: labor,
     productos: prods, responsable: resp, obs: $('ordObs').value.trim(), mapa: $('ordMapa').checked, clave: clave });
   if (await encolar(r)) {
     ordLotes = {}; ordCampo = ''; ordProds = [PROD_VACIO()];
@@ -1525,10 +1683,12 @@ function actualizarTodo(manual, forzar) {
   if (!manual && !forzar && Date.now() - ultimaActualizacion < 300000) return;
   ultimaActualizacion = Date.now();
   cargarDatos(); refrescarRegistros(manual); cargarImagenes();
+  if (lee(LS.clave, '')) refrescarOrdenes();
 }
 async function init() {
   try {
     const [d, q, r, rs] = await Promise.all([dbGet('datos'), dbTx('cola', 'readonly', o => o.getAll()), dbGet('recientes'), dbGet('resumen')]);
+    ordenes = (await dbGet('ordenes')) || [];
     resumen = rs || [];
     if (d) datos = d;
     cola = q || [];
