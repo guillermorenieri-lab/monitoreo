@@ -247,7 +247,7 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
           <input id="metrosLect" type="number" inputmode="decimal" min="0.1" step="0.1" oninput="setMetros(this.value)">
         </div>
         <div id="golpes" style="margin-top:12px"></div>
-        <button class="btn" id="btnGolpe" style="width:100%" onclick="agregarGolpe()">+ Agregar golpe</button>
+        <button class="btn" id="btnGolpe" style="width:100%" onclick="agregarGolpe()">+ Otro golpe de esta plaga</button>
         <div class="res" id="resConteo" hidden></div>
       </div>
 
@@ -275,7 +275,7 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
       </div>
       </div>
 
-      <button class="btn" id="btnLectura" style="width:100%;margin-top:14px" onclick="agregarLectura()">+ Agregar otra plaga</button>
+      <button class="btn" id="btnLectura" style="width:100%;margin-top:14px" onclick="agregarLectura()">Listo, cargar otra plaga en este punto</button>
     </section>
 
     <section class="card">
@@ -717,8 +717,8 @@ function pintarMetodo() {
   $('metrosWrap').hidden = met !== 'Metro lineal';
   $('metrosLect').value = m.metros;
   $('medTitulo').textContent = esInc ? 'Incidencia' : 'Conteo';
-  $('btnGolpe').textContent = pano ? '+ Agregar golpe' : '+ Agregar muestra';
-  $('btnLectura').textContent = '+ Agregar otra ' + m.tipo.toLowerCase();
+  $('btnGolpe').textContent = pano ? '+ Otro golpe de esta plaga' : '+ Otra muestra de esta plaga';
+  $('btnLectura').textContent = 'Listo, cargar otra ' + m.tipo.toLowerCase() + ' en este punto';
   document.querySelectorAll('#segMet button').forEach(b => b.classList.toggle('on', b.dataset.v === m.metodo));
   pintarGolpes();
 }
@@ -1029,7 +1029,7 @@ async function refrescarRegistros(manual) {
     pintarReg();
     if (manual) toast('Lista actualizada');
   } catch (e) {
-    if (!claveRechazada(e) && manual) toast('No se pudo actualizar', true);
+    if (!claveRechazada(e) && manual) toast('No se pudo actualizar: ' + e.message, true);
   }
 }
 function datoMon(r) {
@@ -1074,7 +1074,7 @@ async function refrescarResumen(manual) {
     pintarResumen();
     if (manual) toast('Resumen actualizado');
   } catch (e) {
-    if (!claveRechazada(e) && (manual || !resumen.length)) toast('No se pudo actualizar el resumen', true);
+    if (!claveRechazada(e) && (manual || !resumen.length)) toast('No se pudo actualizar el resumen: ' + e.message, true);
   }
 }
 const fechaDM = f => f.slice(8, 10) + '/' + f.slice(5, 7);
