@@ -18,6 +18,8 @@
 :root{
   --paper:#F6F7F2; --card:#FFFFFF; --ink:#15221A; --mute:#566358; --line:#C9D1C2;
   --field:#1E5A38; --field-d:#14402A; --sun:#F4C21F; --alert:#B8372A; --ok:#2E7D4F; --warn:#C98A00;
+  --tint:#EAF2EC; --tint2:#F7FAF8;
+  --mon:#1E5A38; --ot:#1A4F8B; --ot-d:#123A68; --ot-tint:#E6EEF7; --ot-tint2:#F5F8FC;
   --head:'Barlow Semi Condensed','Barlow',system-ui,sans-serif;
   --body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
@@ -82,7 +84,7 @@ button{font-family:var(--body);cursor:pointer}
 .chip{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:4px 6px 4px 14px;border:2px solid var(--ink);border-radius:999px;background:#fff;font:700 20px var(--head)}
 .chip button{width:36px;height:36px;border:0;border-radius:50%;background:var(--line);color:var(--ink);font:700 20px var(--body)}
 
-.res{margin-top:14px;padding:12px 14px;border:2px solid var(--field);border-radius:10px;background:#EAF2EC}
+.res{margin-top:14px;padding:12px 14px;border:2px solid var(--field);border-radius:10px;background:var(--tint)}
 .res .big{font:700 58px/1 var(--head);color:var(--field-d)}
 .res .u{font:600 20px var(--head);color:var(--mute);margin-left:4px}
 .res .det{margin-top:6px;font-size:16px;color:var(--mute)}
@@ -118,7 +120,7 @@ details.res-grupo{margin-bottom:10px;border:2px solid var(--ink);border-radius:1
 details.res-grupo>summary{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;min-height:52px;padding:12px 14px;cursor:pointer;font:700 21px var(--head)}
 details.res-grupo>summary span{color:var(--mute);font:500 16px var(--body)}
 details.res-grupo>.dentro{padding:0 10px 10px}
-details.res-lote{border-color:var(--field);background:#F7FAF8}
+details.res-lote{border-color:var(--field);background:var(--tint2)}
 .res-dia{margin-top:10px;padding:10px 12px;border:2px solid var(--line);border-radius:8px;background:#fff}
 .res-dia h3{margin:0 0 6px;font:700 19px var(--head)}
 .res-dia h3 span{color:var(--mute);font:500 15px var(--body)}
@@ -135,7 +137,7 @@ details.res-lote{border-color:var(--field);background:#F7FAF8}
 #toast.show{opacity:1}
 #toast.err{background:var(--alert);border-color:var(--alert)}
 .map{height:300px;margin-top:10px;border:2px solid var(--ink);border-radius:8px;background:var(--line)}
-.lotebadge{margin-top:10px;padding:10px 12px;border:2px solid var(--field);border-radius:8px;background:#EAF2EC;font-weight:600}
+.lotebadge{margin-top:10px;padding:10px 12px;border:2px solid var(--field);border-radius:8px;background:var(--tint);font-weight:600}
 .lotebadge.fuera{border-color:var(--warn);background:#FFF5DB}
 .ndvi{margin-top:10px;padding:10px 12px;border:2px solid var(--ink);border-radius:8px;background:#fff}
 .ndvi .top{display:flex;align-items:center;gap:10px}
@@ -162,8 +164,18 @@ body.enguia main,body.enguia .tabs{display:none}
 .cfgdato{margin:0 0 6px}
 .seg.chico button{padding:6px 2px;font-size:15px}
 .res-tot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.res-tot div{padding:10px 12px;border:2px solid var(--field);border-radius:10px;background:#EAF2EC;font-size:15px;color:var(--mute)}
+.res-tot div{padding:10px 12px;border:2px solid var(--field);border-radius:10px;background:var(--tint);font-size:15px;color:var(--mute)}
 .res-tot b{display:block;font:700 26px/1.1 var(--head);color:var(--field-d)}
+/* Color por sección: verde monitoreo y conteo, azul órdenes y labores, gris en la lista mezclada */
+body.sec-ot{--field:var(--ot);--field-d:var(--ot-d);--tint:var(--ot-tint);--tint2:var(--ot-tint2)}
+body.sec-mix{--field:#33383C;--field-d:#23272A}
+body.sec-ot .btn-main{background:var(--ot);color:#fff}
+body.sec-ot .btn-main:active{background:var(--ot-d)}
+.fila.mon{--field:var(--mon);--field-d:#14402A;border-left:9px solid var(--mon)}
+.fila.ot{--field:var(--ot);--field-d:var(--ot-d);border-left:9px solid var(--ot)}
+.etq{display:inline-block;margin-top:6px;padding:2px 10px;border:2px solid var(--ink);border-radius:999px;font-weight:700;font-size:15px;background:#fff;color:var(--ink)}
+.etq.pendiente{background:var(--sun)}
+.etq.realizada{background:var(--ink);color:#fff}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 </head>
@@ -1103,13 +1115,18 @@ function datoMon(r) {
   if (r.promedio !== '' && r.promedio != null) return fmt2(r.promedio) + ' por metro' + (r.categoria ? ' · ' + esc(r.categoria) : '');
   return fmt1(r.incidencia) + '% de incidencia' + (r.severidad ? ', severidad ' + esc(r.severidad) : '');
 }
+function etiquetaEstado(estado) {
+  if (estado === 'Realizada') return '<span class="etq realizada">Realizada</span>';
+  if (estado === 'Pendiente') return '<span class="etq pendiente">Pendiente</span>';
+  return '';
+}
 function fila(r, pend) {
-  if (r.tabla === 'estado') return '<div class="fila pend"><div class="fila-top"><b>' + esc(r.nro) + '</b><span>' + esc(r.labor) + '</span></div><div>Pasa a ' + esc(r.estado.toLowerCase()) + '</div></div>';
+  if (r.tabla === 'estado') return '<div class="fila ot pend"><div class="fila-top"><b>' + esc(r.nro) + '</b><span>' + esc(r.labor) + '</span></div><div>Pasa a ' + esc(r.estado.toLowerCase()) + '</div></div>';
   if (r.tabla === 'orden') {
     const lotes = Array.isArray(r.lotes) ? r.lotes.map(l => l.lote).join(', ') : r.lote;
     const has = Array.isArray(r.lotes) ? r.lotes.reduce((a, l) => a + (Number(l.has) || 0), 0) : r.has;
     const pdf = r.pdf && /^https:/.test(r.pdf) ? '<a class="pdflink" href="' + esc(r.pdf) + '" target="_blank" rel="noopener">Abrir PDF</a> &nbsp; <button class="btn-link" data-u="' + esc(r.pdf) + '" data-t="' + esc(r.nro) + '" onclick="compartirPdf(this)">Compartir</button>' : (r.pdf ? '<div class="dato">' + esc(r.pdf) + '</div>' : (pend ? '' : ''));
-    return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.nro || 'Orden') + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>Orden de ' + esc((r.labor || 'aplicación').toLowerCase()) + (r.estado === 'Realizada' ? ' (realizada)' : '') + ': ' + esc(lotes) + '</div><div class="dato">' + fmt1(has) + ' ha</div>' + pdf + '</div>';
+    return '<div class="fila ot' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.nro || 'Orden') + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>Orden de ' + esc((r.labor || 'aplicación').toLowerCase()) + ': ' + esc(lotes) + '</div><div class="dato">' + fmt1(has) + ' ha</div>' + etiquetaEstado(r.estado) + (pdf ? '<div>' + pdf + '</div>' : '') + '</div>';
   }
   const titulo = r.tabla === 'punto' ? 'Punto de monitoreo'
     : r.tabla === 'mon' ? esc(r.tipo) + ': ' + esc(r.problema) : 'Conteo de ' + (r.momento === 'Siembra' ? 'siembra' : 'emergencia');
@@ -1117,7 +1134,7 @@ function fila(r, pend) {
     : r.tabla === 'mon' ? datoMon(r)
     : fmt0(r.ha) + (r.momento === 'Siembra' ? ' semillas/ha' : ' plantas/ha') + (r.logro !== '' && r.logro != null ? ', logro ' + fmt1(r.logro) + '%' : '');
   const mapa = (r.lat !== '' && r.lat != null) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(r.lat + ',' + r.lng) + '" target="_blank" rel="noopener">Ver en el mapa</a>' : '';
-  return '<div class="fila' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.lote) + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>' + titulo + '</div><div class="dato">' + dato + '</div>' + mapa + '</div>';
+  return '<div class="fila mon' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.lote) + '</b><span>' + esc(r.campo) + '</span><time>' + esc(r.fecha) + ' ' + esc(r.hora) + '</time></div><div>' + titulo + '</div><div class="dato">' + dato + '</div>' + mapa + '</div>';
 }
 function compartirPdf(b) {
   const u = b.dataset.u, t = 'Orden de aplicación ' + b.dataset.t;
@@ -1151,6 +1168,7 @@ function setVistaRes(v) {
   document.querySelectorAll('#segRes button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('resMon').hidden = v !== 'mon';
   $('resOrd').hidden = v === 'mon';
+  pintarSeccion();
   if (v !== 'mon') { pintarDetalle(); refrescarDetalle(); }
 }
 function setEstRes(v) {
@@ -1748,9 +1766,9 @@ function tarjetaOrden(o) {
   } else {
     pie = '<button class="btn" style="width:100%;margin-top:8px" onclick="abrirRealizar(\'' + esc(o.id) + '\')">Marcar realizada</button>';
   }
-  return '<div class="fila"><div class="fila-top"><b>' + esc(o.nro) + '</b><span>' + esc(o.labor) + '</span><time>' + esc(fechaCorta(o.fecha)) + '</time></div>' +
+  return '<div class="fila ot"><div class="fila-top"><b>' + esc(o.nro) + '</b><span>' + esc(o.labor) + '</span><time>' + esc(fechaCorta(o.fecha)) + '</time></div>' +
     '<div>' + esc(o.campo) + (o.cultivo ? ' · ' + esc(o.cultivo) : '') + '</div><div>' + lotes + '</div>' +
-    '<div class="dato">' + fmt1(o.has) + ' ha · ' + esc(o.maquina) + (o.contratista ? ' · ' + esc(o.contratista) : '') + '</div>' + pdf + pie + '</div>';
+    '<div class="dato">' + fmt1(o.has) + ' ha · ' + esc(o.maquina) + (o.contratista ? ' · ' + esc(o.contratista) : '') + '</div>' + etiquetaEstado(o.estado === 'Realizada' ? 'Realizada' : 'Pendiente') + (pdf ? '<div>' + pdf + '</div>' : '') + pie + '</div>';
 }
 function pintarOrdenes() {
   const real = ordVista === 'real';
@@ -1968,8 +1986,18 @@ const guardarOrden = unaVez(async () => {
 });
 
 /* ---------- pestañas e inicio ---------- */
+/** Color de la sección: azul en órdenes y labores, gris en Registros (mezcla ambos), verde en el resto. */
+function pintarSeccion() {
+  const n = ['mon', 'cont', 'ord', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
+  const ot = n === 'ord' || (n === 'res' && resVista !== 'mon');
+  const mix = n === 'reg';
+  document.body.classList.toggle('sec-ot', ot);
+  document.body.classList.toggle('sec-mix', mix);
+  document.querySelector('meta[name=theme-color]').content = ot ? '#1A4F8B' : mix ? '#33383C' : '#1E5A38';
+}
 function tab(n) {
   ['mon', 'cont', 'ord', 'res', 'reg'].forEach(k => { $('tab-' + k).hidden = k !== n; $('t-' + k).classList.toggle('on', k === n); });
+  pintarSeccion();
   $('ctxwrap').hidden = n === 'reg' || n === 'res';
   $('loteWrap').hidden = n === 'ord';
   $('gpsCard').hidden = n === 'ord';
