@@ -144,6 +144,19 @@ details.res-lote{border-color:var(--field);background:#F7FAF8}
 .ndvi select{flex:1;min-height:46px;font-size:17px}
 .ndvi input[type=range]{min-height:36px;padding:0;border:0}
 body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
+body.enguia{padding-bottom:0}
+body.enguia main,body.enguia .tabs{display:none}
+#guia{padding:14px;max-width:640px;margin:0 auto}
+.guia-sup{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.guia-sup h2{margin:0}
+.guia-red{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.guia-item{display:block;width:100%;padding:0;overflow:hidden;border:2px solid var(--ink);border-radius:10px;background:#fff;color:var(--ink);text-align:left}
+.guia-item img,.guia-item .sinfoto{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--line)}
+.guia-item .sinfoto{display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:15px}
+.guia-item b{display:block;padding:8px 10px;font:700 18px/1.15 var(--head)}
+.guia-foto{display:block;width:100%;margin-bottom:10px;border:2px solid var(--ink);border-radius:10px;background:var(--line)}
+.guia-txt b{display:block;margin-top:12px;color:var(--mute);font-size:16px}
+.guia-txt p{margin:2px 0 0}
 #setup{padding:14px;max-width:640px;margin:0 auto}
 #setupMsg{margin:0 0 6px}
 .cfgdato{margin:0 0 6px}
@@ -172,6 +185,18 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
     <button class="btn-main" id="btnCfg" onclick="configurar()">Entrar</button>
     <button class="btn-link" id="btnCfgCancelar" hidden onclick="cerrarSetup()">Cancelar</button>
   </div>
+</section>
+
+<section id="guia" hidden>
+  <div class="guia-sup"><h2 id="guiaTitulo">Guía</h2><button class="btn" onclick="cerrarGuia()">Volver</button></div>
+  <div id="guiaLista">
+    <input id="guiaBuscar" type="search" autocomplete="off" placeholder="Buscar plaga, maleza o enfermedad" oninput="pintarGuia()" aria-label="Buscar en la guía">
+    <a class="btn-link" id="guiaWeb" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">Buscar fotos en internet</a>
+    <div class="guia-red" id="guiaRed"></div>
+    <div class="gpsinfo" id="guiaEstado"></div>
+    <button class="btn" id="btnGuia" style="width:100%;margin-top:10px" onclick="bajarGuia()">Guardar fotos en el celular</button>
+  </div>
+  <div id="guiaFicha" hidden></div>
 </section>
 
 <main>
@@ -229,6 +254,7 @@ body.sinconfig main,body.sinconfig .tabs,body.sinconfig #estado{display:none}
       </div>
       <label for="problema">Cuál</label>
       <select id="problema" onchange="onProblema()"></select>
+      <button class="btn-link" onclick="abrirGuia()">Ver guía de identificación</button>
       <div id="otroWrap" hidden><label for="otro">Nombre</label><input id="otro" autocomplete="off"></div>
       <label for="estadio">Estadio del cultivo (ej. V3, R2)</label>
       <input id="estadio" autocomplete="off">
@@ -1306,6 +1332,164 @@ function pintarResumen() {
   }).join('');
 }
 
+/* ---------- guía de identificación ---------- */
+let guia = [], guiaGuardadas = new Set(), guiaBajando = false, guiaActual = null, guiaElegida = '';
+const guiaUrl = {};
+const normTxt = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const raizTxt = t => normTxt(t).split(/\s+/).filter(p => p.length > 3).map(p => p.replace(/(es|s)$/, ''));
+/** Achica la foto para guardarla en el celular. */
+function achicarFoto(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => rej(new Error('Formato de foto no compatible'));
+    img.src = url;
+  });
+}
+async function fotoGuia(id, bajar) {
+  if (guiaUrl[id]) return guiaUrl[id];
+  let url = await dbGet('gf:' + id).catch(() => null);
+  if (!url && bajar && navigator.onLine) {
+    url = await achicarFoto(await api('guiaFoto', { id: id }, 90000));
+    await dbSet('gf:' + id, url).catch(() => {});
+    guiaGuardadas.add(id);
+  }
+  if (url) guiaUrl[id] = url;
+  return url || '';
+}
+async function actualizarGuia() {
+  if (!equipo || !apiLista() || !navigator.onLine) return;
+  try {
+    guia = (await api('guia')) || [];
+    dbSet('guia', guia).catch(() => {});
+    const vigentes = new Set(guia.flatMap(g => g.fotos));
+    const claves = await dbKeys();
+    for (const k of claves) if (String(k).startsWith('gf:') && !vigentes.has(String(k).slice(3))) await dbDel(k);
+    guiaGuardadas = new Set(claves.filter(k => String(k).startsWith('gf:')).map(k => String(k).slice(3)).filter(id => vigentes.has(id)));
+    if (!$('guia').hidden && $('guiaFicha').hidden) { filtrarGuiaElegida(); pintarGuia(); }
+  } catch (e) {
+    if (!claveRechazada(e) && !guia.length) toast('No se pudo leer la guía: ' + e.message, true);
+  }
+}
+async function abrirGuia() {
+  const sel = $('problema').value === '__otro' ? $('otro').value.trim() : $('problema').value;
+  if (!guia.length) guia = (await dbGet('guia').catch(() => null)) || [];
+  if (!guiaGuardadas.size) guiaGuardadas = new Set((await dbKeys().catch(() => [])).filter(k => String(k).startsWith('gf:')).map(k => String(k).slice(3)));
+  guiaElegida = sel;
+  $('guiaBuscar').value = '';
+  filtrarGuiaElegida();
+  $('guia').hidden = false;
+  document.body.classList.add('enguia');
+  verListaGuia();
+  history.pushState({ guia: 1 }, '');
+  window.scrollTo(0, 0);
+  actualizarGuia();
+}
+/** Abre la guía en lo que está elegido en Cuál, si la guía lo tiene. */
+function filtrarGuiaElegida() {
+  const raices = raizTxt(guiaElegida);
+  if (guiaElegida && !$('guiaBuscar').value && guia.some(g => raices.some(r => normTxt(g.nombre).includes(r)))) {
+    $('guiaBuscar').value = guiaElegida;
+    guiaElegida = '';
+  }
+}
+function salirGuia() {
+  $('guia').hidden = true;
+  document.body.classList.remove('enguia');
+}
+function cerrarGuia() {
+  if (history.state && history.state.guia) history.back(); else salirGuia();
+}
+function verListaGuia() {
+  guiaActual = null;
+  $('guiaLista').hidden = false;
+  $('guiaFicha').hidden = true;
+  $('guiaTitulo').textContent = 'Guía';
+  pintarGuia();
+}
+function pintarGuia() {
+  const t = $('guiaBuscar').value.trim(), raices = raizTxt(t);
+  const lista = !t ? guia : guia.filter(g => normTxt(g.nombre).includes(normTxt(t)) || raices.some(r => normTxt(g.nombre).includes(r)));
+  const cultivo = $('cultivo').value;
+  $('guiaWeb').href = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent((t || 'plagas') + ' ' + cultivo);
+  $('guiaWeb').textContent = 'Buscar ' + (t ? '"' + t + '"' : 'fotos') + ' en internet';
+  $('guiaRed').innerHTML = lista.map(g => '<button class="guia-item" onclick="abrirFicha(' + guia.indexOf(g) + ')"><span class="sinfoto" data-f="' + esc(g.fotos[0] || '') + '">Sin foto guardada</span><b>' + esc(g.nombre) + '</b></button>').join('') ||
+    '<p class="vacio" style="grid-column:1/3">' + (guia.length ? 'No hay coincidencias en la guía.' : navigator.onLine ? 'Buscando la guía…' : 'La guía todavía no se bajó. Abrila una vez con señal.') + '</p>';
+  document.querySelectorAll('#guiaRed .sinfoto').forEach(async el => {
+    const id = el.dataset.f;
+    if (!id) return;
+    const url = await fotoGuia(id, false);
+    if (url && el.isConnected) { const i = new Image(); i.alt = ''; i.src = url; el.replaceWith(i); }
+  });
+  const total = guia.reduce((a, g) => a + g.fotos.length, 0), hay = guia.flatMap(g => g.fotos).filter(id => guiaGuardadas.has(id)).length;
+  if (!guiaBajando) $('guiaEstado').textContent = total ? hay + ' de ' + total + ' fotos guardadas para usar sin señal' : '';
+  $('btnGuia').hidden = !total || hay >= total;
+}
+async function bajarGuia() {
+  if (guiaBajando) return;
+  if (!navigator.onLine) return toast('Sin señal para bajar las fotos', true);
+  const faltan = guia.flatMap(g => g.fotos).filter(id => !guiaGuardadas.has(id));
+  guiaBajando = true;
+  $('btnGuia').disabled = true;
+  let fallas = 0, hechas = 0;
+  for (const id of faltan) {
+    $('guiaEstado').textContent = 'Guardando foto ' + (hechas + fallas + 1) + ' de ' + faltan.length + '…';
+    try { await fotoGuia(id, true); hechas++; } catch (e) { fallas++; }
+    if (!navigator.onLine) break;
+  }
+  guiaBajando = false;
+  $('btnGuia').disabled = false;
+  if (!$('guia').hidden && $('guiaFicha').hidden) pintarGuia();
+  toast(fallas ? 'No se pudieron guardar ' + contar(fallas, 'foto', 'fotos') : 'Guía guardada en el celular', !!fallas);
+}
+async function abrirFicha(i) {
+  const g = guia[i];
+  guiaActual = g;
+  $('guiaLista').hidden = true;
+  $('guiaFicha').hidden = false;
+  $('guiaTitulo').textContent = g.nombre;
+  const dato = (t, v) => v ? '<b>' + t + '</b><p>' + esc(v).replace(/\n/g, '<br>') + '</p>' : '';
+  const texto = dato('Cómo reconocerla', g.reconocer) + dato('Daño', g.dano) + dato('Umbral', g.umbral);
+  $('guiaFicha').innerHTML = '<div id="guiaFotos"></div><div class="guia-txt">' + texto + '</div>' +
+    '<button class="btn-main" onclick="usarFicha()">Usar en este monitoreo</button>' +
+    '<a class="btn-link" style="display:inline-block;margin-top:10px" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(g.nombre + ' ' + $('cultivo').value) + '">Ver más fotos en internet</a>' +
+    '<button class="btn-link" style="display:block" onclick="verListaGuia()">Volver a la lista</button>';
+  window.scrollTo(0, 0);
+  for (const id of g.fotos) {
+    let url = '';
+    try { url = await fotoGuia(id, true); } catch (e) { /* se avisa abajo */ }
+    if (guiaActual !== g) return;
+    const cont = $('guiaFotos');
+    if (url) { const im = new Image(); im.className = 'guia-foto'; im.alt = g.nombre; im.src = url; cont.appendChild(im); }
+    else if (!cont.querySelector('.vacio')) cont.insertAdjacentHTML('beforeend', '<p class="vacio">Esta foto no está guardada. Abrila con señal.</p>');
+  }
+}
+function usarFicha() {
+  const g = guiaActual;
+  if (!g) return;
+  const tipo = ['Plaga', 'Enfermedad', 'Maleza'].includes(g.tipo) ? g.tipo : 'Plaga';
+  setTipo(tipo);
+  const lista = datos.catalogo[tipo] || [], igual = lista.find(n => normTxt(n) === normTxt(g.nombre));
+  const raices = raizTxt(g.nombre);
+  const parecidas = igual ? [igual] : lista.filter(n => raices.some(r => normTxt(n).includes(r)));
+  if (parecidas.length === 1) {
+    $('problema').value = parecidas[0];
+  } else {
+    $('problema').value = '__otro';
+    $('otro').value = g.nombre;
+  }
+  onProblema();
+  programarBorrador();
+  cerrarGuia();
+  toast($('problema').value === '__otro' ? 'Cargada como ' + g.nombre + '. Podés agregarla al Catalogo.' : 'Elegida: ' + $('problema').value);
+}
+
 /* ---------- mapa y detección del lote ---------- */
 let mapa = null, capaLotes = null, marcador = null;
 function ptEnRing(x, y, ring) {
@@ -1849,6 +2033,7 @@ async function init() {
     if (document.hidden) { guardarBorrador(); return; }
     sincronizar(); actualizarTodo();
   });
+  window.addEventListener('popstate', () => { if (!$('guia').hidden) salirGuia(); });
   document.addEventListener('input', programarBorrador);
   document.addEventListener('click', programarBorrador);
   window.addEventListener('offline', actualizarEstado);
