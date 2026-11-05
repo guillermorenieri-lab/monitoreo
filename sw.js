@@ -1,7 +1,7 @@
 // Guarda la app en el celular para que abra sin señal.
 // Al abrir, responde con lo guardado y busca la versión nueva por detrás:
 // los cambios subidos a GitHub se ven la siguiente vez que se abre la app.
-const CACHE = 'monitoreo-v1';
+const CACHE = 'monitoreo-v2';
 const ARCHIVOS = [
   './', 'index.html', 'config.js', 'manifest.webmanifest',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/fonts.css',
