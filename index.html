@@ -596,10 +596,17 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
           <div class="cli-gd-res" style="margin-top:12px"></div>
         </section>
         <p class="cli-nota" id="cliNota"></p>
+        <section class="card" id="cliAct" hidden>
+          <h2>Actualizar estación</h2>
+          <p class="cli-nota">En la PC, elegí tu Clima_Pozo.xlsx actualizado. Se calcula acá y solo se envía el resumen de los días nuevos.</p>
+          <input id="estArchivo" type="file" accept=".xlsx,.xlsm,.xls,.csv" onchange="leerEstacion(this)">
+          <p class="cli-nota" id="estEstado" role="status"></p>
+          <button class="btn-main" id="estConfirma" hidden onclick="guardarEstacion()">Agregar a la planilla</button>
+        </section>
       </div>
     </div>
     <button class="btn" style="width:100%" onclick="actualizarSolapaLl()">Actualizar</button>
-    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 I</p>
+    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 J</p>
   </div>
 
   <!-- REGISTROS -->
@@ -611,7 +618,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <p class="cfgdato" id="cfgUsuario"></p>
       <p class="cfgdato" id="cfgOffline"></p>
       <button class="btn" id="btnInstalar" style="width:100%" hidden onclick="instalarApp()">Instalar app</button>
-      <p class="cfgdato">Versión 05/11 I</p>
+      <p class="cfgdato">Versión 05/11 J</p>
       <button class="btn-link" onclick="abrirSetup()">Cambiar nombre o clave</button>
     </section>
   </div>
@@ -2612,7 +2619,7 @@ function resumenCli(filas) {
   return { dias: filas.length, tmax: con('tmax').length ? Math.max(...con('tmax').map(r => r.tmax)) : null, tmin: con('tmin').length ? Math.min(...con('tmin').map(r => r.tmin)) : null,
     tmed: prom('tmed'), hum: prom('hum'), viento: prom('viento'), rad: prom('rad'), ll: suma('ll'), et: suma('et'), etDias: con('et').length, mj: suma('rad') == null ? null : suma('rad') * W_A_MJ, mjDia: prom('rad') == null ? null : prom('rad') * W_A_MJ, radDias: con('rad').length, estDias: filas.filter(r => r.est).length, hel: filas.filter(r => r.tmin != null && r.tmin < 0).length };
 }
-const W_A_MJ = 0.0864;
+const W_A_MJ = 0.0864, ET_A = 0.3352, ET_B = 1.0193;
 const mjTxt = (s, cal) => s.mj == null ? '-' : fmt0(s.mj) + (s.radDias < cal ? '*' : '');
 const diasMes = ini => new Date(Date.UTC(Number(ini.slice(0, 4)), Number(ini.slice(5, 7)), 0)).getUTCDate();
 const etTxt = s => s.et == null ? '-' : fmt1(s.et) + (s.etDias < s.dias ? '*' : '');
@@ -2700,8 +2707,125 @@ function pintarClima() {
       x.map((r, i) => '<tr' + (r.est ? ' class="cli-est"' : '') + '><td>' + fechaDM(r.f) + (r.inc ? '*' : '') + (r.est ? ' e' : '') + '</td><td>' + n1(r.tmax) + '</td><td>' + n1(r.tmin) + '</td><td>' + n1(r.tmed) + '</td><td>' + n1(r.hum) + '</td><td>' + n1(r.viento) + '</td><td>' + n1(r.vmax) + '</td><td>' + n1(r.rad) + '</td><td>' + (r.rad == null ? '-' : n1(r.rad * W_A_MJ)) + '</td><td>' + fmt0(x.slice(0, i + 1).reduce((a, y) => a + (y.rad || 0), 0) * W_A_MJ) + '</td><td' + (r.etEst ? ' class="cli-est"' : '') + '>' + n1(r.et) + '</td><td>' + n1(r.ll) + '</td></tr>'));
   }
   pintarGD();
+  $('cliAct').hidden = !lee(LS.clave, '');
   $('cliNota').textContent = 'Datos hasta ' + fechaCorta(clima[clima.length - 1].f) + '. MJ/m² = radiación media del día × 0,0864. En amarillo o con «e»: dato estimado con NASA POWER ajustada a la estación, o ET calculada con FAO-56. El asterisco marca días con pocas lecturas o períodos con datos faltantes. La lluvia de la estación es solo de referencia.';
 }
+
+/* ---------- actualizar estación: lee el Excel en la PC y manda solo el resumen de cada día ---------- */
+const XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+let estNuevos = [], estTrabajo = null;
+function trabajoEstacion() {
+  const cuerpo = `importScripts('${XLSX_URL}');
+  const fechaTxt = v => {
+    if (typeof v === 'number') return new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 864e5).toISOString().slice(0, 10);
+    const s = String(v == null ? '' : v).trim();
+    let m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})/);
+    if (m) return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+    return '';
+  };
+  const horaTxt = v => {
+    if (typeof v === 'number') { const t = Math.round((v % 1) * 1440) % 1440; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); }
+    const m = String(v == null ? '' : v).match(/(\\d{1,2}):(\\d{2})/);
+    return m ? m[1].padStart(2, '0') + ':' + m[2] : '';
+  };
+  const num = v => { if (typeof v === 'number') return v; const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
+  onmessage = e => {
+    try {
+      const { buf, desde, hasta } = e.data, datos = new Uint8Array(buf);
+      postMessage({ aviso: 'Buscando la hoja de lecturas…' });
+      const nombres = XLSX.read(datos, { type: 'array', bookSheets: true }).SheetNames;
+      const hoja = nombres.find(n => /^anexado$/i.test(n)) || nombres.find(n => /^GL_/i.test(n)) || nombres[0];
+      postMessage({ aviso: 'Leyendo la hoja ' + hoja + '. Puede tardar un minuto…' });
+      const ws = XLSX.read(datos, { type: 'array', sheets: hoja, dense: true, cellStyles: false, cellHTML: false, cellFormula: false }).Sheets[hoja];
+      const filas = ws['!data'] || ws;
+      const valor = (f, c) => (f && f[c] ? f[c].v : null);
+      let cab = -1, col = {};
+      for (let i = 0; i < Math.min(filas.length, 30) && cab < 0; i++) {
+        const t = (filas[i] || []).map(c => String(c && c.v != null ? c.v : '').trim());
+        if (t.some(x => /^fecha/i.test(x)) && t.some(x => /^hora/i.test(x))) {
+          cab = i;
+          const busca = re => t.findIndex(x => re.test(x));
+          col = { f: busca(/^fecha/i), h: busca(/^hora/i), t: busca(/^temp/i), hu: busca(/^hum/i), v: busca(/viento media/i), ll: busca(/^lluvia/i), r: busca(/^rad/i), et: busca(/^et\\b/i) };
+        }
+      }
+      if (cab < 0 || [col.t, col.hu, col.v, col.ll, col.r].includes(-1)) throw new Error('No encontré las columnas de la estación en la hoja ' + hoja);
+      const dias = {}, visto = new Set();
+      for (let i = cab + 1; i < filas.length; i++) {
+        const f = filas[i], fe = fechaTxt(valor(f, col.f));
+        if (!fe || fe <= desde || fe >= hasta) continue;
+        const h = horaTxt(valor(f, col.h)), k = fe + h;
+        if (!h || visto.has(k)) continue;
+        visto.add(k);
+        const d = dias[fe] = dias[fe] || { t: [], hu: [], v: [], r: [], ll: 0, et: 0, nEt: 0, dec: false, n: 0, cuarto: false };
+        d.n++;
+        if (/:(15|45)$/.test(h)) d.cuarto = true;
+        [['t', col.t], ['hu', col.hu], ['v', col.v], ['r', col.r]].forEach(([c, j]) => { const x = num(valor(f, j)); if (x != null) d[c].push(x); });
+        d.ll += num(valor(f, col.ll)) || 0;
+        const et = col.et < 0 ? null : num(valor(f, col.et));
+        if (et != null) { d.et += et; d.nEt++; if (et % 1) d.dec = true; }
+      }
+      const prom = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+      postMessage({ dias: Object.keys(dias).sort().map(fe => { const d = dias[fe]; return { f: fe, tmax: Math.max(...d.t), tmin: Math.min(...d.t), tmed: prom(d.t), hum: prom(d.hu), v: prom(d.v), vmax: Math.max(...d.v), rad: prom(d.r), ll: d.ll,
+        et: d.dec && d.nEt / d.n > 0.9 && d.et <= 15 ? d.et : null, inc: d.n / (d.cuarto ? 96 : 48) < 0.7 }; }) });
+    } catch (err) { postMessage({ error: err.message }); }
+  };`;
+  return new Worker(URL.createObjectURL(new Blob([cuerpo], { type: 'text/javascript' })));
+}
+/* ET de referencia FAO-56 ajustada con la ET medida por la estación */
+function etCalculada(d) {
+  const z = 320, fi = -24.6567 * Math.PI / 180, j = Math.round((new Date(d.f + 'T12:00:00Z') - new Date(d.f.slice(0, 4) + '-01-01T12:00:00Z')) / 864e5) + 1;
+  const sat = t => 0.6108 * Math.exp(17.27 * t / (t + 237.3)), tm = (d.tmax + d.tmin) / 2, u2 = d.v / 3.6, mj = d.rad * W_A_MJ;
+  const es = (sat(d.tmax) + sat(d.tmin)) / 2, ea = es * d.hum / 100, D = 4098 * sat(tm) / Math.pow(tm + 237.3, 2), g = 0.000665 * 101.3 * Math.pow((293 - 0.0065 * z) / 293, 5.26);
+  const dr = 1 + 0.033 * Math.cos(2 * Math.PI * j / 365), de = 0.409 * Math.sin(2 * Math.PI * j / 365 - 1.39), ws = Math.acos(-Math.tan(fi) * Math.tan(de));
+  const Ra = 24 * 60 / Math.PI * 0.082 * dr * (ws * Math.sin(fi) * Math.sin(de) + Math.cos(fi) * Math.cos(de) * Math.sin(ws)), Rso = (0.75 + 2e-5 * z) * Ra;
+  const k4 = t => Math.pow(t + 273.16, 4), Rnl = 4.903e-9 * (k4(d.tmax) + k4(d.tmin)) / 2 * (0.34 - 0.14 * Math.sqrt(Math.max(ea, 0))) * (1.35 * Math.min(1, Math.max(0.3, mj / Rso)) - 0.35);
+  const et0 = Math.max(0, (0.408 * D * (0.77 * mj - Rnl) + g * 900 / (tm + 273) * u2 * (es - ea)) / (D + g * (1 + 0.34 * u2)));
+  return Math.max(0, ET_A + ET_B * et0);
+}
+function leerEstacion(input) {
+  const arch = input.files[0];
+  if (!arch) return;
+  if (!clima) { toast('Abrí Clima con señal antes de actualizar', true); return; }
+  $('estConfirma').hidden = true; estNuevos = [];
+  $('estEstado').textContent = 'Abriendo ' + arch.name + '…';
+  if (estTrabajo) estTrabajo.terminate();
+  const buenos = clima.filter(r => !r.inc), desde = buenos[buenos.length - 1].f;
+  arch.arrayBuffer().then(buf => {
+    estTrabajo = trabajoEstacion();
+    estTrabajo.onerror = () => { $('estEstado').textContent = 'No se pudo leer el archivo. Revisá la señal e intentá de nuevo.'; };
+    estTrabajo.onmessage = e => {
+      const m = e.data;
+      if (m.aviso) { $('estEstado').textContent = m.aviso; return; }
+      estTrabajo.terminate(); estTrabajo = null;
+      if (m.error) { $('estEstado').textContent = m.error; return; }
+      estNuevos = m.dias;
+      const calc = estNuevos.filter(d => d.et == null).length, inc = estNuevos.filter(d => d.inc).length;
+      if (!estNuevos.length) { $('estEstado').textContent = 'No hay días nuevos: Clima ya está al día hasta ' + fechaCorta(desde) + '.'; return; }
+      $('estEstado').textContent = 'Encontré ' + estNuevos.length + ' días nuevos, del ' + fechaCorta(estNuevos[0].f) + ' al ' + fechaCorta(estNuevos[estNuevos.length - 1].f) + '.' +
+        (calc ? ' La ET de ' + calc + ' días se calcula con FAO-56.' : '') + (inc ? ' ' + inc + ' con pocas lecturas.' : '');
+      $('estConfirma').hidden = false;
+    };
+    estTrabajo.postMessage({ buf, desde, hasta: hoyTxt() }, [buf]);
+  });
+}
+const guardarEstacion = unaVez(async () => {
+  const r1 = v => v == null ? '' : Math.round(v * 10) / 10;
+  const dias = estNuevos.map(d => {
+    const calc = d.et == null, et = calc ? etCalculada(d) : d.et;
+    return [d.f, r1(d.tmax), r1(d.tmin), r1(d.tmed), r1(d.hum), r1(d.v), r1(d.vmax), r1(d.rad), r1(d.ll), r1(et), d.inc ? 'Incompleto' : 'Completo', calc ? 'Sí' : ''];
+  });
+  $('estEstado').textContent = 'Guardando en la planilla…';
+  try {
+    const r = (await api('guardarEstacion', { claveOrdenes: lee(LS.clave, ''), dias }, 120000)) || {};
+    $('estEstado').textContent = 'Listo: ' + (r.agregados || 0) + ' días agregados' + (r.reemplazados ? ' y ' + r.reemplazados + ' completados' : '') + '.';
+    $('estConfirma').hidden = true; estNuevos = []; $('estArchivo').value = '';
+    await cargarClima(true);
+  } catch (e) {
+    $('estEstado').textContent = 'No se pudo guardar: ' + e.message;
+  }
+});
 
 function pintarSeccion() {
   const n = ['mon', 'cont', 'ord', 'llu', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
