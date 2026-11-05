@@ -179,6 +179,33 @@ body.enguia main,body.enguia .tabs{display:none}
 /* Color por sección: verde monitoreo y conteo, azul órdenes y labores, gris en la lista mezclada */
 body.sec-ot{--field:var(--ot);--field-d:var(--ot-d);--tint:var(--ot-tint);--tint2:var(--ot-tint2)}
 body.sec-mix{--field:#33383C;--field-d:#23272A}
+body.sec-ll{--field:#155E75;--field-d:#0E4A5C;--tint:#E3F1F5;--tint2:#F4FAFB}
+.fila.ll{--field:#155E75;--field-d:#0E4A5C;border-left:9px solid #155E75}
+.ll-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.ll-chip{min-height:60px;padding:6px 4px;border:2px solid var(--ink);border-radius:8px;background:#fff;color:var(--ink);font-family:var(--body)}
+.ll-chip b{display:block;font:700 19px/1.1 var(--head)}
+.ll-chip span{font-size:15px;color:var(--mute)}
+.ll-chip.listo{background:var(--tint)}
+.ll-chip.on{background:var(--sun);box-shadow:0 0 0 2px var(--ink)}
+.ll-chip.on span{color:var(--ink)}
+.ll-tip{padding:1px 5px;border:0;border-radius:4px;background:rgba(21,34,26,.82);color:#fff;font:600 13px var(--body);box-shadow:none}
+.ll-tip::before{display:none}
+#llMm{min-height:68px;font:700 34px var(--head);text-align:center}
+.ll-graf{position:relative}
+.ll-graf svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.ll-graf .grid{stroke:var(--line);stroke-width:1}
+.ll-graf .ax{fill:var(--mute);font:500 13px var(--body)}
+.ll-graf .cruz{stroke:var(--ink);stroke-width:1}
+.ll-tooltip{position:absolute;top:0;z-index:2;padding:6px 10px;border:2px solid var(--ink);border-radius:8px;background:#fff;font-size:15px;white-space:nowrap;pointer-events:none}
+.ll-leyenda{display:flex;flex-wrap:wrap;gap:4px 16px;margin-bottom:8px;font-size:15px;color:var(--mute)}
+.ll-leyenda span{display:flex;align-items:center;gap:6px}
+.ll-leyenda i{display:inline-block;width:24px}
+.ll-tabla table{width:100%;border-collapse:collapse;font-size:17px}
+.ll-tabla th{text-align:right;padding:6px;border-bottom:2px solid var(--ink);color:var(--mute);font-size:15px}
+.ll-tabla td{text-align:right;padding:4px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.ll-tabla th:first-child,.ll-tabla td:first-child{text-align:left}
+.ll-tabla td .btn-link{min-height:36px;padding:0;font-size:17px}
+.ll-tabla tr.zona td{padding-top:12px;font-weight:700;background:var(--tint2)}
 body.sec-ot .btn-main{background:var(--ot);color:#fff}
 body.sec-ot .btn-main:active{background:var(--ot-d)}
 .fila.mon{--field:var(--mon);--field-d:#14402A;border-left:9px solid var(--mon)}
@@ -437,13 +464,14 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
   </div>
 
   <!-- RESUMEN -->
+  <div class="seg chico" id="segRes" style="margin-bottom:14px" hidden>
+    <button data-v="mon" class="on" onclick="setVistaRes('mon')">Monitoreo</button>
+    <button data-v="lab" onclick="setVistaRes('lab')">Labores</button>
+    <button data-v="lot" onclick="setVistaRes('lot')">Lotes</button>
+    <button data-v="ins" onclick="setVistaRes('ins')">Insumos</button>
+    <button data-v="reg" onclick="setVistaRes('reg')">Registros</button>
+  </div>
   <div id="tab-res" class="tab" hidden>
-    <div class="seg chico" id="segRes" style="margin-bottom:14px">
-      <button data-v="mon" class="on" onclick="setVistaRes('mon')">Monitoreo</button>
-      <button data-v="lab" onclick="setVistaRes('lab')">Labores</button>
-      <button data-v="lot" onclick="setVistaRes('lot')">Lotes</button>
-      <button data-v="ins" onclick="setVistaRes('ins')">Insumos</button>
-    </div>
     <div id="resMon">
     <section class="card">
       <h2>Monitoreos de la semana</h2>
@@ -469,6 +497,62 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
     <button class="btn" style="width:100%" onclick="actualizarResumen()">Actualizar resumen</button>
   </div>
 
+  <!-- LLUVIAS -->
+  <div id="tab-llu" class="tab" hidden>
+    <div class="seg" id="segLl" style="margin-bottom:14px">
+      <button data-v="reg" class="on" onclick="setVistaLl('reg')">Registrar</button>
+      <button data-v="acu" onclick="setVistaLl('acu')">Acumulados</button>
+    </div>
+    <div id="llReg">
+      <p class="vacio" id="llSinDatos" hidden>Todavía no están cargados los pluviómetros. Abrí la app con señal.</p>
+      <div id="llForm">
+        <section class="card">
+          <div class="seg chico" id="llCampos"></div>
+          <div id="mapLl" class="map"></div>
+          <div class="lotebadge" id="llCerca" hidden></div>
+          <div class="ll-chips" id="llChips"></div>
+          <div class="gpsinfo" id="llFalta"></div>
+        </section>
+        <section class="card">
+          <h2 id="llTitulo">Elegí un pluviómetro</h2>
+          <div class="grid2">
+            <div><label for="llFecha">Fecha</label><input id="llFecha" type="date" onchange="cambiarFechaLl()"></div>
+            <div><label for="llCamp">Campaña</label><select id="llCamp" onchange="ll.campTocada=true"></select></div>
+          </div>
+          <label for="llMm">Milímetros</label>
+          <input id="llMm" inputmode="decimal" autocomplete="off" placeholder="0">
+          <label for="llObs">Observaciones (opcional)</label>
+          <input id="llObs" autocomplete="off">
+          <button class="btn-main" onclick="guardarLluvia()">Guardar lluvia</button>
+        </section>
+        <h2>Últimas lecturas</h2>
+        <div id="llUltimas"></div>
+      </div>
+    </div>
+    <div id="llAcu" hidden>
+      <section class="card">
+        <div class="seg chico" id="llfCampo"></div>
+        <div class="grid2" style="margin-top:12px">
+          <div><label for="llfCamp">Campaña</label><select id="llfCamp" onchange="setFiltroLl('camp',this.value)"></select></div>
+          <div id="llfVerWrap"><label for="llfVer">Ver</label><select id="llfVer" onchange="setFiltroLl('ver',this.value)"></select></div>
+        </div>
+        <div class="seg chico" id="llfPer" style="margin-top:12px">
+          <button data-v="semana" onclick="setFiltroLl('per','semana')">Semana</button>
+          <button data-v="decada" onclick="setFiltroLl('per','decada')">Década</button>
+          <button data-v="mes" onclick="setFiltroLl('per','mes')">Mes</button>
+        </div>
+        <div id="llfCompWrap"><label for="llfComp">Comparar con</label><select id="llfComp" onchange="setFiltroLl('comp',this.value)"></select></div>
+      </section>
+      <div id="llTot" class="res-tot"></div>
+      <section class="card" id="llGrafAcu"></section>
+      <section class="card" id="llGrafPer"></section>
+      <section class="card" id="llPluv"></section>
+      <section class="card" id="llHist"></section>
+      <div id="llAcuDet"></div>
+    </div>
+    <button class="btn" style="width:100%" onclick="refrescarLluvias(true)">Actualizar lluvias</button>
+  </div>
+
   <!-- REGISTROS -->
   <div id="tab-reg" class="tab" hidden>
     <div id="listaReg"></div>
@@ -487,8 +571,8 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
   <button id="t-mon" class="on" onclick="tab('mon')">Monitoreo</button>
   <button id="t-cont" onclick="tab('cont')">Conteo</button>
   <button id="t-ord" onclick="tab('ord')">Orden</button>
+  <button id="t-llu" onclick="tab('llu')">Lluvias</button>
   <button id="t-res" onclick="tab('res')">Resumen</button>
-  <button id="t-reg" onclick="tab('reg')">Registros</button>
 </nav>
 <div id="toast" role="status"></div>
 
@@ -636,7 +720,7 @@ function programarBorrador() {
   borradorT = setTimeout(guardarBorrador, 300);
 }
 function leerBorrador() {
-  const tabAct = ['mon', 'cont', 'ord', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
+  const tabAct = ['mon', 'cont', 'ord', 'llu', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
   return { tab: tabAct, tipo: m.tipo, ev: m.ev, af: m.af, sev: m.sev, foto: m.foto,
     metodo: m.metodo, metros: m.metros, cats: m.cats, golpes: m.golpes, lecturas: m.lecturas, incTocado: m.incTocado,
     problema: $('problema').value, otro: $('otro').value, estadio: $('estadio').value, obsMon: $('obsMon').value,
@@ -745,7 +829,7 @@ function tomarGPS() {
 }
 function pintarPos() {
   pintarPosBase();
-  if (pos) { detectarLote(); pintarMapa(); }
+  if (pos) { detectarLote(); pintarMapa(); posEnLl(); }
 }
 function pintarPosBase() {
   const info = $('gpsInfo');
@@ -1099,13 +1183,14 @@ async function sincronizar(manual) {
   sincronizando = false;
   actualizarEstado();
   if (err && !claveRechazada(err) && manual) toast('No se pudo enviar: ' + err.message, true);
-  if (enviados) { refrescarRegistros(); refrescarOrdenes(); refrescarDetalle(); if (!err) toast('Enviado a la hoja'); }
+  if (enviados) { refrescarRegistros(); refrescarOrdenes(); refrescarDetalle(); refrescarLluvias(); if (!err) toast('Enviado a la hoja'); }
 }
 function actualizarEstado() {
   const n = cola.length, on = navigator.onLine;
   $('estado').className = 'estado ' + (!on ? 'off' : n ? 'pend' : 'ok');
   $('estadoTxt').textContent = sincronizando ? 'Enviando…' : !on ? (n ? 'Sin señal, ' + n + ' sin enviar' : 'Sin señal') : n ? n + ' sin enviar' : 'Todo enviado';
   if (!$('tab-reg').hidden) pintarReg();
+  if (!$('tab-llu').hidden && ll.vista === 'reg') pintarRegLl();
 }
 
 /* ---------- registros ---------- */
@@ -1131,6 +1216,7 @@ function etiquetaEstado(estado) {
   return '';
 }
 function fila(r, pend) {
+  if (r.tabla === 'lluvia') return '<div class="fila ll' + (pend ? ' pend' : '') + '"><div class="fila-top"><b>' + esc(r.pluviometro) + '</b><span>' + esc(r.campo) + '</span><time>' + esc(fechaDM(r.fecha)) + (r.hora ? ' ' + esc(r.hora) : '') + '</time></div><div class="dato">' + fmt1(r.mm) + ' mm</div>' + (r.obs ? '<div>' + esc(r.obs) + '</div>' : '') + (pend ? '<div>Sin enviar</div>' : '') + '</div>';
   if (r.tabla === 'estado') return '<div class="fila ot pend"><div class="fila-top"><b>' + esc(r.nro) + '</b><span>' + esc(r.labor) + '</span></div><div>Pasa a ' + esc(r.estado.toLowerCase()) + '</div></div>';
   if (r.tabla === 'orden') {
     const lotes = Array.isArray(r.lotes) ? r.lotes.map(l => l.lote).join(', ') : r.lote;
@@ -1173,9 +1259,12 @@ async function refrescarResumen(manual) {
 }
 /* ---------- resúmenes de labores, lotes e insumos ---------- */
 let detalle = { filas: [], costos: false }, resVista = 'mon', resEstado = 'real';
+function marcarSegRes(v) { document.querySelectorAll('#segRes button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
 function setVistaRes(v) {
+  if (v === 'reg') { tab('reg'); return; }
+  if ($('tab-res').hidden) tab('res');
   resVista = v;
-  document.querySelectorAll('#segRes button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  marcarSegRes(v);
   $('resMon').hidden = v !== 'mon';
   $('resOrd').hidden = v === 'mon';
   pintarSeccion();
@@ -2022,22 +2111,423 @@ const guardarOrden = unaVez(async () => {
 
 /* ---------- pestañas e inicio ---------- */
 /** Color de la sección: azul en órdenes y labores, gris en Registros (mezcla ambos), verde en el resto. */
+/* ---------- lluvias: registro por pluviómetro y acumulados por campaña ---------- */
+const MESES_LL = ['Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr', 'May'];
+let lluvias = [], histLl = [], ll = { vista: 'reg', campo: '', pluv: '', campTocada: false, fechaTocada: false };
+let llf = { camp: '', campo: '', ver: '', per: 'mes', comp: 'media' };
+let mapaLl = null, capaLl = null, llEncuadrado = '', llAvisoCerca = '';
+
+function campaniaDe(f) {
+  const y = Number(f.slice(0, 4)), a = Number(f.slice(5, 7)) >= 6 ? y : y - 1;
+  return a + '/' + String(a + 1).slice(2);
+}
+function hoyTxt() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+const pluvs = () => datos.pluv || [];
+const camposLl = () => [...new Set(pluvs().map(p => p.campo))];
+const pluvDe = n => pluvs().find(p => p.nombre === n);
+function distM(a, b, c, d) {
+  const r = Math.PI / 180, x = (d - b) * r * Math.cos((a + c) / 2 * r), y = (c - a) * r;
+  return Math.sqrt(x * x + y * y) * 6371000;
+}
+const textoDist = m => m < 1000 ? Math.round(m) + ' m' : fmt1(m / 1000) + ' km';
+
+/* datos del servidor y de lo que espera señal en el celular */
+function unirLluvias(serv) {
+  const ids = new Set(serv.map(r => r.id));
+  return serv.concat(cola.filter(r => r.tabla === 'lluvia' && !ids.has(r.id)));
+}
+async function refrescarLluvias(manual) {
+  if (!equipo || !apiLista() || !navigator.onLine || !datos.pluv) { if (manual) toast('Sin señal. Muestro lo último guardado.', true); return; }
+  try {
+    const r = (await api('lluvias')) || {};
+    lluvias = unirLluvias(r.lecturas || []);
+    histLl = r.historico || [];
+    dbSet('lluvias', { lecturas: lluvias, historico: histLl }).catch(() => {});
+    if (!$('tab-llu').hidden) pintarLl();
+    if (manual) toast('Lluvias actualizadas');
+  } catch (e) {
+    if (!claveRechazada(e) && manual) toast('No se pudieron actualizar las lluvias: ' + e.message, true);
+  }
+}
+
+/* registrar */
+function setVistaLl(v) {
+  ll.vista = v;
+  document.querySelectorAll('#segLl button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('llReg').hidden = v !== 'reg';
+  $('llAcu').hidden = v !== 'acu';
+  pintarLl();
+  if (v === 'reg' && mapaLl) setTimeout(() => mapaLl.invalidateSize(), 0);
+  window.scrollTo(0, 0);
+}
+function entrarLl() {
+  if (!ll.fechaTocada) $('llFecha').value = hoyTxt();
+  $('llFecha').max = hoyTxt();
+  if (!ll.campTocada) poblarCampLl();
+  pintarLl();
+  if (ll.vista === 'reg') { iniciarMapaLl(); tomarGPS(); }
+  refrescarLluvias();
+}
+function poblarCampLl() {
+  const f = $('llFecha').value || hoyTxt(), a = Number(campaniaDe(f).slice(0, 4));
+  const lista = [a + 1, a, a - 1].map(x => x + '/' + String(x + 1).slice(2));
+  const actual = ll.campTocada ? $('llCamp').value : campaniaDe(f);
+  $('llCamp').innerHTML = lista.map(c => '<option>' + c + '</option>').join('');
+  $('llCamp').value = lista.includes(actual) ? actual : campaniaDe(f);
+}
+function cambiarFechaLl() { ll.fechaTocada = $('llFecha').value !== hoyTxt(); ll.campTocada = false; poblarCampLl(); pintarLl(); }
+function elegirCampoLl(c) { ll.campo = c; ll.pluv = ''; llEncuadrado = ''; pintarLl(); }
+function elegirPluv(n) {
+  const p = pluvDe(n);
+  if (!p) return;
+  if (p.campo !== ll.campo) llEncuadrado = '';
+  ll.campo = p.campo; ll.pluv = n;
+  pintarLl();
+}
+function lecturasDelDia(fecha) {
+  const g = {};
+  lluvias.filter(r => r.fecha === fecha).forEach(r => { (g[r.pluviometro] = g[r.pluviometro] || []).push(Number(r.mm)); });
+  return g;
+}
+function masCercano() {
+  if (!pos) return null;
+  return pluvs().map(p => ({ p, d: distM(pos.lat, pos.lng, p.lat, p.lng) })).sort((a, b) => a.d - b.d)[0] || null;
+}
+function posEnLl() {
+  const c = masCercano();
+  if (c && !ll.pluv && c.d < 500) elegirPluv(c.p.nombre);
+  else if (c && !ll.campo && c.d < 40000) elegirCampoLl(c.p.campo);
+  else if (!$('tab-llu').hidden) pintarLl();
+}
+function pintarRegLl() {
+  const lista = pluvs();
+  $('llSinDatos').hidden = !!lista.length;
+  $('llForm').hidden = !lista.length;
+  if (!lista.length) return;
+  const campos = camposLl();
+  if (!campos.includes(ll.campo)) ll.campo = (ctx.campo && campos.find(c => normTxt(c) === normTxt(ctx.campo))) || campos[0];
+  $('llCampos').innerHTML = campos.map(c => '<button class="' + (c === ll.campo ? 'on' : '') + '" data-c="' + esc(c) + '" onclick="elegirCampoLl(this.dataset.c)">' + esc(c) + '</button>').join('');
+  const fecha = $('llFecha').value || hoyTxt(), dia = lecturasDelDia(fecha);
+  const delCampo = lista.filter(p => p.campo === ll.campo);
+  $('llChips').innerHTML = delCampo.map(p => {
+    const v = dia[p.nombre], tiene = v !== undefined;
+    return '<button class="ll-chip' + (p.nombre === ll.pluv ? ' on' : '') + (tiene ? ' listo' : '') + '" data-p="' + esc(p.nombre) + '" onclick="elegirPluv(this.dataset.p)">' +
+      '<b>' + esc(p.nombre) + '</b><span>' + (tiene ? fmt1(v.reduce((a, b) => a + b, 0)) + ' mm' : 'Falta') + '</span></button>';
+  }).join('');
+  const hechos = delCampo.filter(p => dia[p.nombre] !== undefined);
+  $('llFalta').textContent = !hechos.length ? 'Sin lecturas en este campo el ' + fechaDM(fecha) + '.'
+    : hechos.length === delCampo.length ? 'Campo completo para el ' + fechaDM(fecha) + '.'
+    : hechos.length + ' de ' + delCampo.length + ' cargados el ' + fechaDM(fecha) + '. Donde no llovió, cargá 0 mm.';
+  const c = masCercano(), cerca = $('llCerca');
+  cerca.hidden = !c || c.d >= 40000;
+  if (c && c.d < 40000) {
+    const mismo = c.p.nombre === ll.pluv;
+    cerca.innerHTML = 'Estás a ' + textoDist(c.d) + ' de ' + esc(c.p.nombre) + (mismo ? '' : ' <button class="btn-link" data-p="' + esc(c.p.nombre) + '" onclick="elegirPluv(this.dataset.p)">Elegir</button>');
+  }
+  $('llTitulo').textContent = ll.pluv ? 'Lluvia en ' + ll.pluv : 'Elegí un pluviómetro';
+  pintarMapaLl();
+  const ult = lluvias.slice().sort((a, b) => (b.fecha + (b.hora || '')).localeCompare(a.fecha + (a.hora || ''))).slice(0, 5);
+  const pend = new Set(cola.map(r => r.id));
+  $('llUltimas').innerHTML = ult.length ? ult.map(r => fila(Object.assign({ tabla: 'lluvia' }, r), pend.has(r.id))).join('') : '<p class="vacio">Todavía no hay lecturas.</p>';
+}
+const guardarLluvia = unaVez(async () => {
+  const p = pluvDe(ll.pluv);
+  if (!p) return toast('Elegí el pluviómetro', true);
+  const txt = $('llMm').value.trim(), fecha = $('llFecha').value;
+  if (!fecha) return toast('Poné la fecha', true);
+  if (fecha > hoyTxt()) return toast('La fecha no puede ser futura', true);
+  if (!/^\d+([.,]\d+)?$/.test(txt)) return toast('Escribí los milímetros. Si no llovió, poné 0.', true);
+  const mm = num(txt);
+  if (mm > 300 && !confirm(fmt1(mm) + ' mm es mucha lluvia para una lectura. ¿Guardar igual?')) return;
+  const ya = lecturasDelDia(fecha)[p.nombre];
+  if (ya && !confirm(p.nombre + ' ya tiene ' + fmt1(ya.reduce((a, b) => a + b, 0)) + ' mm el ' + fechaDM(fecha) + '. Si guardás, se suman. ¿Seguir?')) return;
+  const d = new Date(), h = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const r = { id: nuevoId(), tabla: 'lluvia', fecha, hora: h, campania: $('llCamp').value, campo: p.campo, zona: p.zona, pluviometro: p.nombre, mm,
+    obs: $('llObs').value.trim(), usuario: equipo ? equipo.nombre : '', lat: pos ? pos.lat : '', lng: pos ? pos.lng : '', acc: pos && pos.acc != null ? Math.round(pos.acc) : '' };
+  lluvias.push(r);
+  if (await encolar(r)) {
+    dbSet('lluvias', { lecturas: lluvias, historico: histLl }).catch(() => {});
+    toast('Guardada: ' + p.nombre + ', ' + fmt1(mm) + ' mm');
+    $('llMm').value = ''; $('llObs').value = '';
+    ll.pluv = '';
+    pintarLl();
+    window.scrollTo(0, 0);
+  } else {
+    lluvias = lluvias.filter(x => x.id !== r.id);
+  }
+});
+
+/* mapa de pluviómetros: los puntos se ven aunque no bajen las imágenes de fondo */
+function iniciarMapaLl() {
+  if (mapaLl) { setTimeout(() => { mapaLl.invalidateSize(); pintarMapaLl(); }, 0); return; }
+  if (typeof L === 'undefined') return;
+  mapaLl = L.map('mapLl');
+  mapaLl.setView([-24.65, -64.05], 10);
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imágenes: Esri, Maxar, Earthstar Geographics' });
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+  sat.addTo(mapaLl);
+  L.control.layers({ 'Satélite': sat, 'Calles': osm }).addTo(mapaLl);
+  capaLl = L.layerGroup().addTo(mapaLl);
+  llEncuadrado = '';
+  pintarMapaLl();
+}
+function pintarMapaLl() {
+  if (!mapaLl || ll.vista !== 'reg') return;
+  capaLl.clearLayers();
+  (datos.geo || []).forEach(g => {
+    L.polygon(g.polys.map(p => p.map(r => r.map(c => [c[1], c[0]]))), { color: '#FFFFFF', weight: 1, fillOpacity: 0.03, interactive: false }).addTo(capaLl);
+  });
+  const dia = lecturasDelDia($('llFecha').value || hoyTxt()), delCampo = pluvs().filter(p => p.campo === ll.campo);
+  pluvs().forEach(p => {
+    const act = p.nombre === ll.pluv, listo = dia[p.nombre] !== undefined;
+    const mk = L.circleMarker([p.lat, p.lng], { radius: act ? 12 : 9, color: '#FFFFFF', weight: 2, fillColor: act ? '#F4C21F' : listo ? '#2E7D4F' : '#0E7490', fillOpacity: 1 });
+    if (p.campo === ll.campo) mk.bindTooltip(p.nombre, { permanent: true, direction: 'right', offset: [10, 0], className: 'll-tip' });
+    mk.on('click', () => elegirPluv(p.nombre));
+    mk.addTo(capaLl);
+  });
+  if (pos) L.circleMarker([pos.lat, pos.lng], { radius: 7, color: '#FFFFFF', weight: 3, fillColor: '#B8372A', fillOpacity: 1, interactive: false }).addTo(capaLl);
+  if (llEncuadrado !== ll.campo && delCampo.length) {
+    llEncuadrado = ll.campo;
+    const b = L.latLngBounds(delCampo.map(p => [p.lat, p.lng]));
+    if (pos && b.pad(0.5).contains([pos.lat, pos.lng])) b.extend([pos.lat, pos.lng]);
+    mapaLl.fitBounds(b, { padding: [28, 28], maxZoom: 15 });
+  }
+}
+
+/* cálculos */
+const inicioCamp = c => Number(c.slice(0, 4));
+/** Lámina de cada día: por pluviómetro suma sus lecturas y promedia entre los pluviómetros cargados ese día. */
+function diario(filas) {
+  const dias = {};
+  filas.forEach(r => { const d = dias[r.fecha] = dias[r.fecha] || {}; d[r.pluviometro] = (d[r.pluviometro] || 0) + Number(r.mm); });
+  const out = {};
+  Object.keys(dias).forEach(f => { const v = Object.values(dias[f]); out[f] = v.reduce((a, b) => a + b, 0) / v.length; });
+  return out;
+}
+const ymd = (y, m, d) => y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+function periodos(c, per) {
+  const a = inicioCamp(c), out = [];
+  if (per === 'semana') {
+    const fin = ymd(a + 1, 5, 31);
+    let ini = ymd(a, 6, 1);
+    while (ini <= fin) {
+      out.push({ ini, et: fechaDM(ini) });
+      const prox = new Date(lunesDe(ini) + 'T12:00:00Z');
+      prox.setUTCDate(prox.getUTCDate() + 7);
+      ini = prox.toISOString().slice(0, 10);
+    }
+    return out;
+  }
+  MESES_LL.forEach((m, i) => {
+    const y = i < 7 ? a : a + 1, mes = (i + 5) % 12 + 1;
+    if (per === 'mes') out.push({ ini: ymd(y, mes, 1), et: m });
+    else [1, 11, 21].forEach((d, j) => out.push({ ini: ymd(y, mes, d), et: m + ' ' + (j + 1) + 'ª' }));
+  });
+  return out;
+}
+/** Suma la lámina diaria por período y arma el acumulado. Después de hoy queda sin dato. */
+function serie(dias, c, per) {
+  const ps = periodos(c, per), hoy = hoyTxt();
+  const fin = ymd(inicioCamp(c) + 1, 5, 31), tope = hoy < fin ? hoy : fin;
+  const mm = ps.map(() => 0);
+  Object.keys(dias).forEach(f => { let i = ps.length - 1; while (i > 0 && ps[i].ini > f) i--; mm[i] += dias[f]; });
+  let ac = 0;
+  return ps.map((p, i) => { ac += mm[i]; const pasado = p.ini <= tope; return { et: p.et, ini: p.ini, mm: pasado ? mm[i] : null, ac: pasado ? ac : null }; });
+}
+const histDe = (c, campo) => histLl.filter(r => r.campania === c && r.campo === campo).sort((a, b) => a.orden - b.orden);
+function mediaHist(campo) {
+  const camps = [...new Set(histLl.filter(r => r.campo === campo).map(r => r.campania))];
+  if (!camps.length) return null;
+  return MESES_LL.map((_, i) => histLl.filter(r => r.campo === campo && r.orden === i + 1).reduce((a, r) => a + r.mm, 0) / camps.length);
+}
+function acumular(v) { let a = 0; return v.map(x => { a += x; return a; }); }
+function mensualDe(c, campo) {
+  const filas = lluvias.filter(r => r.campania === c && r.campo === campo);
+  if (filas.length) return serie(diario(filas), c, 'mes').map(x => x.mm);
+  const h = histDe(c, campo);
+  return h.length ? MESES_LL.map((_, i) => (h.find(r => r.orden === i + 1) || { mm: 0 }).mm) : null;
+}
+
+/* gráficos */
+let X_MAX = 340;
+function svgLineas(series, etiquetas) {
+  const H_ = 240, m = { t: 14, r: 14, b: 28, l: 38 }, n = etiquetas.length, w = X_MAX - m.l - m.r, h = H_ - m.t - m.b;
+  const max = Math.max(10, ...series.flatMap(s => s.v.filter(x => x != null)));
+  const paso = [10, 20, 50, 100, 200, 500].find(p => max / p <= 5) || 500, tope = Math.ceil(max / paso) * paso;
+  const X = i => m.l + (n > 1 ? i * w / (n - 1) : 0), Y = v => m.t + h - v / tope * h;
+  let g = '';
+  for (let v = 0; v <= tope; v += paso) g += '<line class="grid" x1="' + m.l + '" x2="' + (X_MAX - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text class="ax" x="' + (m.l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '</text>';
+  const cada = Math.max(1, Math.ceil(n * 62 / w));
+  etiquetas.forEach((e, i) => { if (i % cada === 0) g += '<text class="ax" x="' + X(i) + '" y="' + (H_ - 8) + '" text-anchor="' + (i === 0 ? 'start' : 'middle') + '">' + esc(e) + '</text>'; });
+  series.forEach(s => {
+    const pts = s.v.map((v, i) => v == null ? null : X(i).toFixed(1) + ',' + Y(v).toFixed(1)).filter(Boolean);
+    g += '<polyline fill="none" stroke="' + s.color + '" stroke-width="' + (s.ref ? 2 : 3) + '" stroke-linejoin="round" stroke-linecap="round"' + (s.ref ? ' stroke-dasharray="6 5"' : '') + ' points="' + pts.join(' ') + '"/>';
+    const k = s.v.map(v => v != null).lastIndexOf(true);
+    if (!s.ref && k >= 0) g += '<circle cx="' + X(k) + '" cy="' + Y(s.v[k]) + '" r="5" fill="' + s.color + '" stroke="#fff" stroke-width="2"/>';
+  });
+  return { svg: '<svg viewBox="0 0 ' + X_MAX + ' ' + H_ + '" role="img" aria-label="Lluvia acumulada">' + g + '<line class="cruz" hidden y1="' + m.t + '" y2="' + (m.t + h) + '"/></svg>', X, n };
+}
+function tocarGrafico(cont, X, n, texto) {
+  const tip = cont.querySelector('.ll-tooltip'), svg = cont.querySelector('svg'), cruz = cont.querySelector('.cruz');
+  const mover = ev => {
+    const r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * X_MAX;
+    let i = 0;
+    for (let k = 0; k < n; k++) if (Math.abs(X(k) - x) < Math.abs(X(i) - x)) i = k;
+    const t = texto(i);
+    if (!t) { tip.hidden = true; return; }
+    tip.innerHTML = t; tip.hidden = false;
+    const px = X(i) / X_MAX * r.width;
+    tip.style.left = Math.min(Math.max(0, px - tip.offsetWidth / 2), r.width - tip.offsetWidth) + 'px';
+    if (cruz) { cruz.removeAttribute('hidden'); cruz.setAttribute('x1', X(i)); cruz.setAttribute('x2', X(i)); }
+  };
+  svg.addEventListener('pointermove', mover);
+  svg.addEventListener('pointerdown', mover);
+  svg.addEventListener('pointerleave', () => { tip.hidden = true; if (cruz) cruz.setAttribute('hidden', ''); });
+}
+function svgBarras(filas, media) {
+  const H_ = 180, m = { t: 12, r: 4, b: 26, l: 38 }, n = filas.length, w = X_MAX - m.l - m.r, h = H_ - m.t - m.b;
+  const max = Math.max(5, media || 0, ...filas.map(f => f.v || 0));
+  const paso = [2, 5, 10, 20, 50, 100, 200, 500].find(p => max / p <= 4) || 500, tope = Math.ceil(max / paso) * paso;
+  const Y = v => m.t + h - v / tope * h, an = w / n, ba = Math.max(2, Math.min(an - 2, 26));
+  const X = i => m.l + an * i + an / 2;
+  let g = '';
+  for (let v = 0; v <= tope; v += paso) g += '<line class="grid" x1="' + m.l + '" x2="' + (X_MAX - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text class="ax" x="' + (m.l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '</text>';
+  const cada = Math.max(1, Math.ceil(n * 62 / w));
+  filas.forEach((f, i) => {
+    if (i % cada === 0) g += '<text class="ax" x="' + X(i) + '" y="' + (H_ - 7) + '" text-anchor="middle">' + esc(f.et) + '</text>';
+    if (f.v > 0) {
+      const alto = Math.max(1.5, Y(0) - Y(f.v)), r = Math.min(4, ba / 2, alto), x = X(i) - ba / 2, y = Y(0) - alto;
+      g += '<path fill="' + (f.tenue ? '#9CC9D6' : '#0E7490') + '" d="M' + x + ' ' + Y(0) + 'V' + (y + r) + 'Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y + 'H' + (x + ba - r) + 'Q' + (x + ba) + ' ' + y + ' ' + (x + ba) + ' ' + (y + r) + 'V' + Y(0) + 'Z"/>';
+    }
+  });
+  if (media) g += '<line x1="' + m.l + '" x2="' + (X_MAX - m.r) + '" y1="' + Y(media) + '" y2="' + Y(media) + '" stroke="#5F6B65" stroke-width="2" stroke-dasharray="6 5"/>';
+  return { svg: '<svg viewBox="0 0 ' + X_MAX + ' ' + H_ + '" role="img" aria-label="Lluvia por período">' + g + '</svg>', X, n };
+}
+
+/* acumulados */
+function setFiltroLl(k, v) { llf[k] = v; if (k === 'campo') llf.ver = ''; pintarAcuLl(); }
+function setSeg(id, v) { document.querySelectorAll('#' + id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
+function pintarAcuLl() {
+  X_MAX = Math.max(280, $('llTot').clientWidth - 32);
+  const campos = camposLl();
+  if (!campos.length) { $('llAcuDet').innerHTML = '<p class="vacio">Falta actualizar el Apps Script para ver las lluvias.</p>'; return; }
+  if (!campos.includes(llf.campo)) llf.campo = campos.includes(ll.campo) ? ll.campo : campos[0];
+  const camps = [...new Set(lluvias.map(r => r.campania).concat(histLl.map(r => r.campania), [campaniaDe(hoyTxt())]))].sort().reverse();
+  if (!camps.includes(llf.camp)) llf.camp = campaniaDe(hoyTxt());
+  $('llfCamp').innerHTML = camps.map(c => '<option>' + c + '</option>').join(''); $('llfCamp').value = llf.camp;
+  $('llfCampo').innerHTML = campos.map(c => '<button data-v="' + esc(c) + '" onclick="setFiltroLl(\'campo\',this.dataset.v)">' + esc(c) + '</button>').join('');
+  setSeg('llfCampo', llf.campo);
+
+  const delCampo = pluvs().filter(p => p.campo === llf.campo);
+  const zonas = [...new Set(delCampo.map(p => p.zona).filter(Boolean))];
+  const opciones = [['', 'Promedio']].concat(zonas.map(z => ['z:' + z, z]), delCampo.map(p => ['p:' + p.nombre, p.nombre]));
+  if (!opciones.some(o => o[0] === llf.ver)) llf.ver = '';
+  $('llfVer').innerHTML = opciones.map(o => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join(''); $('llfVer').value = llf.ver;
+
+  const filas = lluvias.filter(r => r.campania === llf.camp && r.campo === llf.campo);
+  const soloHist = !filas.length && histDe(llf.camp, llf.campo).length > 0;
+  const nombreVer = opciones.find(o => o[0] === llf.ver)[1];
+  const elegidas = llf.ver.startsWith('z:') ? filas.filter(r => r.zona === llf.ver.slice(2)) : llf.ver.startsWith('p:') ? filas.filter(r => r.pluviometro === llf.ver.slice(2)) : filas;
+  const per = soloHist ? 'mes' : llf.per;
+  setSeg('llfPer', per);
+  $('llfPer').hidden = soloHist; $('llfVerWrap').hidden = soloHist;
+
+  let s;
+  if (soloHist) {
+    let ac = 0;
+    s = MESES_LL.map((et, i) => { const r = histDe(llf.camp, llf.campo).find(x => x.orden === i + 1), mm = r ? r.mm : 0; ac += mm; return { et, mm, ac }; });
+  } else s = serie(diario(elegidas), llf.camp, per);
+
+  const dias = diario(elegidas), fechas = Object.keys(dias).filter(f => dias[f] > 0).sort();
+  const total = s.reduce((a, x) => a + (x.mm || 0), 0), media = llf.ver === '' ? mediaHist(llf.campo) : null;
+  const mediaTot = media ? media.reduce((a, b) => a + b, 0) : 0, ult = fechas[fechas.length - 1];
+  $('llTot').innerHTML = '<div><b>' + fmt1(total) + ' mm</b>Acumulado' + (llf.ver ? ' · ' + esc(nombreVer) : ' promedio') + '</div>' +
+    (soloHist ? '' : '<div><b>' + (ult ? fmt1(dias[ult]) + ' mm' : '-') + '</b>Última lluvia' + (ult ? ' · ' + fechaDM(ult) : '') + '</div><div><b>' + fechas.length + '</b>Días con lluvia</div>') +
+    (mediaTot ? '<div><b>' + fmt0(mediaTot) + ' mm</b>Media anual histórica</div>' : '');
+
+  /* comparación: solo por mes y con el promedio del campo */
+  const compWrap = $('llfCompWrap'), puede = per === 'mes' && llf.ver === '';
+  const otras = camps.filter(c => c !== llf.camp && mensualDe(c, llf.campo));
+  const compOps = (media ? [['media', 'Media histórica']] : []).concat(otras.map(c => [c, 'Campaña ' + c]), [['', 'Sin comparar']]);
+  compWrap.hidden = !puede || compOps.length < 2;
+  const comp = compOps.some(o => o[0] === llf.comp) ? llf.comp : compOps[0][0];
+  $('llfComp').innerHTML = compOps.map(o => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join(''); $('llfComp').value = comp;
+
+  const series = [{ nombre: 'Campaña ' + llf.camp, v: s.map(x => x.ac), color: '#0E7490' }];
+  if (puede && comp) {
+    const v = comp === 'media' ? media : mensualDe(comp, llf.campo);
+    if (v) series.push({ nombre: comp === 'media' ? 'Media histórica' : 'Campaña ' + comp, v: acumular(v.map(x => x || 0)), color: '#5F6B65', ref: true });
+  }
+  const gl = svgLineas(series, s.map(x => x.et));
+  const nomPer = { semana: 'semana', decada: 'década', mes: 'mes' }[per];
+  $('llGrafAcu').innerHTML = '<h2>Acumulado por ' + nomPer + '</h2>' +
+    (series.length > 1 ? '<div class="ll-leyenda">' + series.map(x => '<span><i style="border-top:3px ' + (x.ref ? 'dashed' : 'solid') + ' ' + x.color + '"></i>' + esc(x.nombre) + '</span>').join('') + '</div>' : '') +
+    '<div class="ll-graf">' + gl.svg + '<div class="ll-tooltip" hidden></div></div>';
+  tocarGrafico($('llGrafAcu'), gl.X, gl.n, i => s[i].ac == null && series.length < 2 ? '' :
+    '<b>' + esc(s[i].et) + '</b>' + series.map(x => x.v[i] == null ? '' : '<div>' + esc(x.nombre) + ': ' + fmt1(x.v[i]) + ' mm</div>').join(''));
+
+  const gb = svgBarras(s.map(x => ({ et: x.et, v: x.mm })));
+  $('llGrafPer').innerHTML = '<h2>Lluvia por ' + nomPer + '</h2><div class="ll-graf">' + gb.svg + '<div class="ll-tooltip" hidden></div></div>' +
+    '<details class="ll-tabla"><summary class="btn-link">Ver tabla</summary><table><thead><tr><th>' + nomPer[0].toUpperCase() + nomPer.slice(1) + '</th><th>mm</th><th>Acumulado</th></tr></thead><tbody>' +
+    s.filter(x => x.ac != null).map(x => '<tr><td>' + esc(x.et) + '</td><td>' + fmt1(x.mm) + '</td><td>' + fmt1(x.ac) + '</td></tr>').join('') + '</tbody></table></details>';
+  tocarGrafico($('llGrafPer'), gb.X, gb.n, i => s[i].mm == null ? '' : '<b>' + esc(s[i].et) + '</b><div>' + fmt1(s[i].mm) + ' mm</div>');
+
+  /* tabla por pluviómetro y zona */
+  const totP = {};
+  filas.forEach(r => { totP[r.pluviometro] = (totP[r.pluviometro] || 0) + Number(r.mm); });
+  const filaZona = z => {
+    const t = Object.values(diario(filas.filter(r => r.zona === z))).reduce((a, b) => a + b, 0);
+    return '<tr class="zona"><td>' + esc(z) + '</td><td>' + fmt1(t) + '</td></tr>';
+  };
+  const grupos = zonas.length ? zonas : [''];
+  $('llPluv').hidden = soloHist;
+  $('llPluv').innerHTML = '<h2>Por pluviómetro</h2><div class="ll-tabla"><table><thead><tr><th>Pluviómetro</th><th>mm</th></tr></thead><tbody>' +
+    grupos.map(z => (z ? filaZona(z) : '') + delCampo.filter(p => (p.zona || '') === z).map(p =>
+      '<tr><td><button class="btn-link" data-v="p:' + esc(p.nombre) + '" onclick="setFiltroLl(\'ver\',this.dataset.v)">' + esc(p.nombre) + '</button></td><td>' + fmt1(totP[p.nombre] || 0) + '</td></tr>').join('')).join('') +
+    '</tbody></table></div>';
+
+  /* historia de campañas */
+  const cH = [...new Set(histLl.filter(r => r.campo === llf.campo).map(r => r.campania))].sort();
+  $('llHist').hidden = !cH.length;
+  if (cH.length) {
+    const lista = cH.map(c => ({ c, v: histDe(c, llf.campo).reduce((a, r) => a + r.mm, 0) }));
+    const act = campaniaDe(hoyTxt());
+    if (!cH.includes(act)) lista.push({ c: act, v: Object.values(diario(lluvias.filter(r => r.campania === act && r.campo === llf.campo))).reduce((a, b) => a + b, 0), curso: true });
+    const corto = c => c.slice(2, 4) + '-' + c.slice(5);
+    const gh = svgBarras(lista.map(x => ({ et: corto(x.c), v: x.v, tenue: x.c !== llf.camp })), mediaTot);
+    $('llHist').innerHTML = '<h2>Lluvia por campaña</h2><div class="ll-leyenda"><span><i style="border-top:2px dashed #5F6B65"></i>Media ' + fmt0(mediaTot) + ' mm</span><span><i style="border-top:6px solid #0E7490"></i>Campaña elegida</span></div>' +
+      '<div class="ll-graf">' + gh.svg + '<div class="ll-tooltip" hidden></div></div>';
+    tocarGrafico($('llHist'), gh.X, gh.n, i => '<b>' + lista[i].c + (lista[i].curso ? ' (en curso)' : '') + '</b><div>' + fmt0(lista[i].v) + ' mm</div>');
+  }
+}
+function pintarLl() {
+  if (ll.vista === 'reg') pintarRegLl(); else pintarAcuLl();
+}
+
 function pintarSeccion() {
-  const n = ['mon', 'cont', 'ord', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
+  const n = ['mon', 'cont', 'ord', 'llu', 'res', 'reg'].find(k => !$('tab-' + k).hidden);
   const ot = n === 'ord' || (n === 'res' && resVista !== 'mon');
   const mix = n === 'reg';
   document.body.classList.toggle('sec-ot', ot);
   document.body.classList.toggle('sec-mix', mix);
-  document.querySelector('meta[name=theme-color]').content = ot ? '#1A4F8B' : mix ? '#33383C' : '#1E5A38';
+  document.body.classList.toggle('sec-ll', n === 'llu');
+  document.querySelector('meta[name=theme-color]').content = ot ? '#1A4F8B' : mix ? '#33383C' : n === 'llu' ? '#155E75' : '#1E5A38';
 }
 function tab(n) {
-  ['mon', 'cont', 'ord', 'res', 'reg'].forEach(k => { $('tab-' + k).hidden = k !== n; $('t-' + k).classList.toggle('on', k === n); });
+  ['mon', 'cont', 'ord', 'llu', 'res', 'reg'].forEach(k => { $('tab-' + k).hidden = k !== n; });
+  ['mon', 'cont', 'ord', 'llu', 'res'].forEach(k => $('t-' + k).classList.toggle('on', k === n || (k === 'res' && n === 'reg')));
+  $('segRes').hidden = n !== 'res' && n !== 'reg';
+  marcarSegRes(n === 'reg' ? 'reg' : resVista);
   pintarSeccion();
-  $('ctxwrap').hidden = n === 'reg' || n === 'res';
+  $('ctxwrap').hidden = n === 'reg' || n === 'res' || n === 'llu';
   $('loteWrap').hidden = n === 'ord';
   $('gpsCard').hidden = n === 'ord';
   if (n === 'ord') abrirOrden();
   if (n === 'reg') { pintarReg(); refrescarRegistros(); pintarCfg(); }
+  if (n === 'llu') entrarLl();
   if (n === 'res') { pintarResumen(); refrescarResumen(); if (resVista !== 'mon') { pintarDetalle(); refrescarDetalle(); } }
   window.scrollTo(0, 0);
 }
@@ -2049,6 +2539,7 @@ async function cargarDatos() {
     await dbSet('datos', d);
     poblarCtx(); detectarLote(); pintarMapa();
     if (!$('tab-ord').hidden) abrirOrden();
+    if (!$('tab-llu').hidden) pintarLl();
     pintarCfg();
   } catch (e) {
     if (!claveRechazada(e)) toast('Sin conexión: uso la lista de lotes guardada', true);
@@ -2058,7 +2549,7 @@ async function cargarDatos() {
 function actualizarTodo(manual, forzar) {
   if (!manual && !forzar && Date.now() - ultimaActualizacion < 300000) return;
   ultimaActualizacion = Date.now();
-  cargarDatos(); refrescarRegistros(manual); cargarImagenes();
+  cargarDatos(); refrescarRegistros(manual); cargarImagenes(); refrescarLluvias();
   if (lee(LS.clave, '')) refrescarOrdenes();
 }
 async function init() {
@@ -2070,6 +2561,8 @@ async function init() {
     if (d) datos = d;
     cola = q || [];
     recientes = r || [];
+    const gl = await dbGet('lluvias');
+    if (gl) { lluvias = gl.lecturas || []; histLl = gl.historico || []; }
   } catch (e) {
     toast('No se pudo abrir el guardado del teléfono', true);
   }
