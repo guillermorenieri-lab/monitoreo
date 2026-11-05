@@ -2387,8 +2387,8 @@ function tocarGrafico(cont, X, n, texto) {
   svg.addEventListener('pointerdown', mover);
   svg.addEventListener('pointerleave', () => { tip.hidden = true; if (cruz) cruz.setAttribute('hidden', ''); });
 }
-function svgBarras(filas, media) {
-  const H_ = 180, m = { t: 12, r: 4, b: 26, l: 38 }, n = filas.length, w = X_MAX - m.l - m.r, h = H_ - m.t - m.b;
+function svgBarras(filas, media, vertical) {
+  const H_ = vertical ? 200 : 180, m = { t: 12, r: 4, b: vertical ? 46 : 26, l: 38 }, n = filas.length, w = X_MAX - m.l - m.r, h = H_ - m.t - m.b;
   const max = Math.max(5, media || 0, ...filas.map(f => f.v || 0));
   const paso = [2, 5, 10, 20, 50, 100, 200, 500].find(p => max / p <= 4) || 500, tope = Math.ceil(max / paso) * paso;
   const Y = v => m.t + h - v / tope * h, an = w / n, ba = Math.max(2, Math.min(an - 2, 26));
@@ -2397,7 +2397,8 @@ function svgBarras(filas, media) {
   for (let v = 0; v <= tope; v += paso) g += '<line class="grid" x1="' + m.l + '" x2="' + (X_MAX - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text class="ax" x="' + (m.l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '</text>';
   const cada = Math.max(1, Math.ceil(n * 62 / w));
   filas.forEach((f, i) => {
-    if (i % cada === 0) g += '<text class="ax" x="' + X(i) + '" y="' + (H_ - 7) + '" text-anchor="middle">' + esc(f.et) + '</text>';
+    if (vertical) g += '<text class="ax" transform="translate(' + (X(i) + 4) + ' ' + (H_ - 6) + ') rotate(-90)">' + esc(f.et) + '</text>';
+    else if (i % cada === 0) g += '<text class="ax" x="' + X(i) + '" y="' + (H_ - 7) + '" text-anchor="middle">' + esc(f.et) + '</text>';
     if (f.v > 0) {
       const alto = Math.max(1.5, Y(0) - Y(f.v)), r = Math.min(4, ba / 2, alto), x = X(i) - ba / 2, y = Y(0) - alto;
       g += '<path fill="' + (f.tenue ? '#9CC9D6' : '#0E7490') + '" d="M' + x + ' ' + Y(0) + 'V' + (y + r) + 'Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y + 'H' + (x + ba - r) + 'Q' + (x + ba) + ' ' + y + ' ' + (x + ba) + ' ' + (y + r) + 'V' + Y(0) + 'Z"/>';
@@ -2497,7 +2498,7 @@ function pintarAcuLl() {
     const act = campaniaDe(hoyTxt());
     if (!cH.includes(act)) lista.push({ c: act, v: Object.values(diario(lluvias.filter(r => r.campania === act && r.campo === llf.campo))).reduce((a, b) => a + b, 0), curso: true });
     const corto = c => c.slice(2, 4) + '-' + c.slice(5);
-    const gh = svgBarras(lista.map(x => ({ et: corto(x.c), v: x.v, tenue: x.c !== llf.camp })), mediaTot);
+    const gh = svgBarras(lista.map(x => ({ et: corto(x.c), v: x.v, tenue: x.c !== llf.camp })), mediaTot, true);
     $('llHist').innerHTML = '<h2>Lluvia por campaña</h2><div class="ll-leyenda"><span><i style="border-top:2px dashed #5F6B65"></i>Media ' + fmt0(mediaTot) + ' mm</span><span><i style="border-top:6px solid #0E7490"></i>Campaña elegida</span></div>' +
       '<div class="ll-graf">' + gh.svg + '<div class="ll-tooltip" hidden></div></div>';
     tocarGrafico($('llHist'), gh.X, gh.n, i => '<b>' + lista[i].c + (lista[i].curso ? ' (en curso)' : '') + '</b><div>' + fmt0(lista[i].v) + ' mm</div>');
