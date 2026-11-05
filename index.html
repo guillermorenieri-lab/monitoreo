@@ -115,6 +115,16 @@ button{font-family:var(--body);cursor:pointer}
 .oprod .tot{margin-top:6px;font-weight:700;color:var(--field)}
 .oprod .quitar{border:0;background:none;color:var(--alert);font-weight:700;font-size:16px;min-height:40px}
 .otot{font:700 20px var(--head);margin-top:10px}
+.pbusca{margin-top:8px;padding-left:46px;scroll-margin-top:90px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2315221A' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5 21 21'/%3E%3C/svg%3E") no-repeat 12px center/24px}
+.pres{margin-top:6px;max-height:280px;overflow-y:auto;border:2px solid var(--ink);border-radius:8px;background:#fff}
+.pres:empty{display:none}
+.pres button{display:block;width:100%;min-height:52px;padding:8px 12px;border:0;border-bottom:1px solid var(--line);background:#fff;color:var(--ink);text-align:left;font-weight:600;font-size:18px}
+.pres button:last-child{border-bottom:0}
+.pres button:active{background:var(--tint)}
+.pres span{color:var(--mute);font-weight:500;font-size:16px}
+.pres p{margin:0;padding:12px;color:var(--mute)}
+.pelegido{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:52px;margin-top:8px;padding:4px 12px;border:2px solid var(--field);border-radius:8px;background:var(--tint);font-weight:700}
+.pelegido span{color:var(--mute);font-weight:500;font-size:16px}
 .pdflink{display:inline-block;margin-top:4px;font-weight:700}
 details.res-grupo{margin-bottom:10px;border:2px solid var(--ink);border-radius:10px;background:#fff}
 details.res-grupo>summary{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;min-height:52px;padding:12px 14px;cursor:pointer;font:700 21px var(--head)}
@@ -1691,7 +1701,7 @@ async function mostrarNdvi() {
 }
 
 /* ---------- órdenes de aplicación ---------- */
-let ordLotes = {}, ordCampo = '', ordProds = [], borradorMaq = '', borradorLabor = '';
+let ordLotes = {}, ordCampo = '', ordProds = [], borradorMaq = '', borradorLabor = '', ordBusca = {}, ordTodos = {};
 let ordenes = [], ordVista = 'nueva', ordAbierta = '', ordKg = {};
 const LABORES_BASE = ['Fumigación', 'Siembra', 'Fertilización', 'Carpida', 'Cosecha'];
 const LABORES_CON_INSUMOS = ['Fumigación', 'Siembra', 'Fertilización'];
@@ -1902,24 +1912,49 @@ function hasTotal() {
 }
 function pintarProds() {
   const prods = datos.productos || [];
-  const opts = '<option value="">Elegí producto</option>' + prods.map((p, i) => '<option value="' + i + '">' + esc(p.nombre + (p.tipo ? ' (' + p.tipo + ')' : '')) + '</option>').join('');
+  const foco = document.activeElement && /^ob\d+$/.test(document.activeElement.id) ? document.activeElement.id : '';
   $('ordProds').innerHTML = ordProds.map((r, i) => {
     return '<div class="oprod"><div class="top"><b>Producto ' + (i + 1) + '</b>' +
       (ordProds.length > 1 ? '<button class="quitar" onclick="quitarProd(' + i + ')">Quitar</button>' : '') + '</div>' +
-      '<select id="op' + i + '" onchange="selProd(' + i + ',this.value)">' + opts + '</select>' +
+      (prods[r.idx]
+        ? '<div class="pelegido"><div>' + esc(prods[r.idx].nombre) + (prods[r.idx].tipo ? ' <span>' + esc(prods[r.idx].tipo) + '</span>' : '') + '</div><button class="btn-link" onclick="cambiarProd(' + i + ')">Cambiar</button></div>'
+        : '<input class="pbusca" id="ob' + i + '" type="search" autocomplete="off" placeholder="Buscar producto" aria-label="Buscar producto ' + (i + 1) + '" value="' + esc(ordBusca[i] || '') + '" oninput="buscarProd(' + i + ',this.value)" onfocus="verBusca(this)">' +
+          '<div class="pres" id="pr' + i + '"></div><button class="btn-link" onclick="verTodosProd(' + i + ')">Ver todos los productos</button>') +
       '<div class="grid2"><div><label for="od' + i + '" id="ou' + i + '">Dosis</label>' +
       '<input id="od' + i + '" type="number" inputmode="decimal" min="0" step="any" value="' + esc(r.dosis) + '" oninput="dosisProd(' + i + ',this.value)"></div>' +
       '<div><label for="oc' + i + '" id="ov' + i + '">Cantidad total</label>' +
       '<input id="oc' + i + '" type="number" inputmode="decimal" min="0" step="any" value="' + esc(r.total) + '" oninput="totalProd(' + i + ',this.value)"></div></div>' +
       '<div class="tot" id="ot' + i + '"></div></div>';
   }).join('');
-  ordProds.forEach((r, i) => { if (r.idx !== undefined && r.idx !== '') $('op' + i).value = r.idx; });
+  ordProds.forEach((r, i) => { if ($('pr' + i)) pintarBusca(i); });
+  if (foco && $(foco)) $(foco).focus();
   $('btnAddProd').hidden = ordProds.length >= 7;
   pintarOrd();
 }
 function agregarProd() { if (ordProds.length < 7) { ordProds.push(PROD_VACIO()); pintarProds(); } }
-function quitarProd(i) { ordProds.splice(i, 1); pintarProds(); }
-function selProd(i, v) { ordProds[i].idx = v; pintarOrd(); }
+function quitarProd(i) { ordProds.splice(i, 1); ordBusca = {}; ordTodos = {}; pintarProds(); }
+function selProd(i, v) {
+  ordProds[i].idx = v; delete ordBusca[i]; delete ordTodos[i];
+  pintarProds();
+  $('od' + i).focus();
+}
+function cambiarProd(i) { ordProds[i].idx = ''; pintarProds(); $('ob' + i).focus(); }
+function buscarProd(i, t) { ordBusca[i] = t; delete ordTodos[i]; pintarBusca(i); }
+function verTodosProd(i) { ordTodos[i] = !ordTodos[i]; pintarBusca(i); }
+/** Sube el buscador para que el teclado no tape las opciones. */
+function verBusca(el) { setTimeout(() => { if (document.activeElement === el) el.scrollIntoView({ block: 'start' }); }, 300); }
+/** Busca por cualquier parte del nombre o tipo, sin acentos; primero los que empiezan con lo escrito. */
+function pintarBusca(i) {
+  const cont = $('pr' + i), t = normTxt(ordBusca[i] || '').trim();
+  if (!t && !ordTodos[i]) { cont.innerHTML = ''; return; }
+  const partes = t.split(/\s+/).filter(Boolean);
+  const lista = (datos.productos || []).map((p, idx) => ({ p, idx, n: normTxt(p.nombre), txt: normTxt(p.nombre + ' ' + (p.tipo || '')) }))
+    .filter(x => partes.every(q => x.txt.includes(q)))
+    .sort((a, b) => a.n.startsWith(t) === b.n.startsWith(t) ? a.n.localeCompare(b.n, 'es') : a.n.startsWith(t) ? -1 : 1);
+  cont.innerHTML = lista.length
+    ? lista.map(x => '<button onclick="selProd(' + i + ',\'' + x.idx + '\')">' + esc(x.p.nombre) + (x.p.tipo ? ' <span>' + esc(x.p.tipo) + '</span>' : '') + '</button>').join('')
+    : '<p>No encontré productos con eso.</p>';
+}
 function dosisProd(i, v) { ordProds[i].dosis = v; ordProds[i].modo = 'dosis'; pintarOrd(); }
 function totalProd(i, v) { ordProds[i].total = v; ordProds[i].modo = 'total'; pintarOrd(); }
 function pintarOrd() {
