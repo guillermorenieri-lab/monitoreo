@@ -2443,16 +2443,16 @@ function pintarAcuLl() {
   } else s = serie(diario(elegidas), llf.camp, per);
 
   const dias = diario(elegidas), fechas = Object.keys(dias).filter(f => dias[f] > 0).sort();
-  const total = s.reduce((a, x) => a + (x.mm || 0), 0), media = llf.ver === '' ? mediaHist(llf.campo) : null;
+  const total = s.reduce((a, x) => a + (x.mm || 0), 0), media = mediaHist(llf.campo);
   const mediaTot = media ? media.reduce((a, b) => a + b, 0) : 0, ult = fechas[fechas.length - 1];
   $('llTot').innerHTML = '<div><b>' + fmt1(total) + ' mm</b>Acumulado' + (llf.ver ? ' · ' + esc(nombreVer) : ' promedio') + '</div>' +
     (soloHist ? '' : '<div><b>' + (ult ? fmt1(dias[ult]) + ' mm' : '-') + '</b>Última lluvia' + (ult ? ' · ' + fechaDM(ult) : '') + '</div><div><b>' + fechas.length + '</b>Días con lluvia</div>') +
     (mediaTot ? '<div><b>' + fmt0(mediaTot) + ' mm</b>Media anual histórica</div>' : '');
 
   /* comparación: solo por mes y con el promedio del campo */
-  const compWrap = $('llfCompWrap'), puede = per === 'mes' && llf.ver === '';
-  const otras = camps.filter(c => c !== llf.camp && mensualDe(c, llf.campo));
-  const compOps = (media ? [['media', 'Media histórica']] : []).concat(otras.map(c => [c, 'Campaña ' + c]), [['', 'Sin comparar']]);
+  const compWrap = $('llfCompWrap'), puede = per === 'mes';
+  const otras = llf.ver ? [] : camps.filter(c => c !== llf.camp && mensualDe(c, llf.campo));
+  const compOps = (media ? [['media', llf.ver ? 'Media histórica del campo' : 'Media histórica']] : []).concat(otras.map(c => [c, 'Campaña ' + c]), [['', 'Sin comparar']]);
   compWrap.hidden = !puede || compOps.length < 2;
   const comp = compOps.some(o => o[0] === llf.comp) ? llf.comp : compOps[0][0];
   $('llfComp').innerHTML = compOps.map(o => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join(''); $('llfComp').value = comp;
@@ -2460,7 +2460,7 @@ function pintarAcuLl() {
   const series = [{ nombre: 'Campaña ' + llf.camp, v: s.map(x => x.ac), color: '#0E7490' }];
   if (puede && comp) {
     const v = comp === 'media' ? media : mensualDe(comp, llf.campo);
-    if (v) series.push({ nombre: comp === 'media' ? 'Media histórica' : 'Campaña ' + comp, v: acumular(v.map(x => x || 0)), color: '#5F6B65', ref: true });
+    if (v) series.push({ nombre: comp === 'media' ? (llf.ver ? 'Media del campo' : 'Media histórica') : 'Campaña ' + comp, v: acumular(v.map(x => x || 0)), color: '#5F6B65', ref: true });
   }
   const gl = svgLineas(series, s.map(x => x.et));
   const nomPer = { semana: 'semana', decada: 'década', mes: 'mes' }[per];
