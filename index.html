@@ -576,7 +576,6 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
           <div class="grid2" style="margin-top:12px">
             <div id="cliCampWrap"><label for="cliCamp">Campaña</label><select id="cliCamp" onchange="setCli('camp',this.value)"></select></div>
             <div id="cliMesWrap"><label for="cliMes">Mes</label><select id="cliMes" onchange="setCli('mes',this.value)"></select></div>
-            <div><label for="cliHel">Se considera helada con (°C o menos)</label><input id="cliHel" inputmode="text" autocomplete="off" onchange="setCli('hel',this.value)"></div>
           </div>
           <label class="cli-check"><input id="cliConEst" type="checkbox" onchange="setCli('conEst',this.checked)"> Incluir datos estimados</label>
         </section>
@@ -600,7 +599,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       </div>
     </div>
     <button class="btn" style="width:100%" onclick="actualizarSolapaLl()">Actualizar</button>
-    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 H</p>
+    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 I</p>
   </div>
 
   <!-- REGISTROS -->
@@ -612,7 +611,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <p class="cfgdato" id="cfgUsuario"></p>
       <p class="cfgdato" id="cfgOffline"></p>
       <button class="btn" id="btnInstalar" style="width:100%" hidden onclick="instalarApp()">Instalar app</button>
-      <p class="cfgdato">Versión 05/11 H</p>
+      <p class="cfgdato">Versión 05/11 I</p>
       <button class="btn-link" onclick="abrirSetup()">Cambiar nombre o clave</button>
     </section>
   </div>
@@ -2570,11 +2569,11 @@ function actualizarSolapaLl() { if (ll.vista === 'cli') cargarClima(true); else 
 
 /* ---------- clima: reportes de la estación, se bajan solo al entrar ---------- */
 let clima = null, climaFecha = 0, climaBajando = false;
-let cli = Object.assign({ vista: 'mes', camp: '', mes: '', tb: 10, ini: '', fin: '', hel: 0, conEst: true }, lee('mc_cli', {}));
+let cli = Object.assign({ vista: 'mes', camp: '', mes: '', tb: 10, ini: '', fin: '', conEst: true }, lee('mc_cli', {}));
 const baseCli = () => cli.conEst ? clima : clima.filter(r => !r.est);
 const COL_MAX = '#C2571A', COL_MIN = '#0E7490', COL_REF = '#5F6B65';
 const n1 = v => v == null || v === '' ? '-' : fmt1(v);
-function guardarCli() { escribe('mc_cli', { vista: cli.vista, tb: cli.tb, hel: cli.hel, conEst: cli.conEst }); }
+function guardarCli() { escribe('mc_cli', { vista: cli.vista, tb: cli.tb, conEst: cli.conEst }); }
 function expandirClima(filas) {
   const v = x => x === '' || x == null ? null : Number(x);
   return filas.map(r => ({ f: r[0], tmax: v(r[1]), tmin: v(r[2]), tmed: v(r[3]), hum: v(r[4]), viento: v(r[5]), vmax: v(r[6]), rad: v(r[7]), ll: v(r[8]), et: v(r[9]), inc: r[10] === 1, est: r[10] === 2, etEst: !!r[11] }));
@@ -2603,7 +2602,7 @@ async function cargarClima(manual) {
 function setCli(k, v) {
   cli[k] = v;
   if (k === 'conEst') cli.conEst = !!v;
-  if (k === 'tb' || k === 'hel') cli[k] = num(v);
+  if (k === 'tb') cli[k] = num(v);
   if (k === 'camp') { cli.ini = ''; cli.fin = ''; }
   guardarCli(); pintarClima();
 }
@@ -2611,7 +2610,7 @@ function resumenCli(filas) {
   const con = k => filas.filter(r => r[k] != null), prom = k => { const x = con(k); return x.length ? x.reduce((a, r) => a + r[k], 0) / x.length : null; };
   const suma = k => { const x = con(k); return x.length ? x.reduce((a, r) => a + r[k], 0) : null; };
   return { dias: filas.length, tmax: con('tmax').length ? Math.max(...con('tmax').map(r => r.tmax)) : null, tmin: con('tmin').length ? Math.min(...con('tmin').map(r => r.tmin)) : null,
-    tmed: prom('tmed'), hum: prom('hum'), viento: prom('viento'), rad: prom('rad'), ll: suma('ll'), et: suma('et'), etDias: con('et').length, mj: suma('rad') == null ? null : suma('rad') * W_A_MJ, mjDia: prom('rad') == null ? null : prom('rad') * W_A_MJ, radDias: con('rad').length, estDias: filas.filter(r => r.est).length, hel: filas.filter(r => r.tmin != null && r.tmin <= cli.hel).length };
+    tmed: prom('tmed'), hum: prom('hum'), viento: prom('viento'), rad: prom('rad'), ll: suma('ll'), et: suma('et'), etDias: con('et').length, mj: suma('rad') == null ? null : suma('rad') * W_A_MJ, mjDia: prom('rad') == null ? null : prom('rad') * W_A_MJ, radDias: con('rad').length, estDias: filas.filter(r => r.est).length, hel: filas.filter(r => r.tmin != null && r.tmin < 0).length };
 }
 const W_A_MJ = 0.0864;
 const mjTxt = (s, cal) => s.mj == null ? '-' : fmt0(s.mj) + (s.radDias < cal ? '*' : '');
@@ -2655,7 +2654,7 @@ function pintarClima() {
   const camps = [...new Set(clima.map(r => campaniaDe(r.f)))].sort().reverse();
   if (!camps.includes(cli.camp)) cli.camp = camps[0];
   $('cliCamp').innerHTML = camps.map(c => '<option>' + c + '</option>').join(''); $('cliCamp').value = cli.camp;
-  $('cliHel').value = cli.hel; $('cliTb').value = cli.tb;
+  $('cliTb').value = cli.tb;
   document.querySelectorAll('#cliVista button').forEach(b => b.classList.toggle('on', b.dataset.v === cli.vista));
   $('cliCampWrap').hidden = cli.vista === 'camp';
   $('cliConEst').checked = cli.conEst;
@@ -2666,7 +2665,7 @@ function pintarClima() {
   const tot = (lista, cal, titulo) => {
     const s = resumenCli(lista);
     $('cliTotTit').textContent = titulo;
-    $('cliTot').innerHTML = '<div><b>' + n1(s.tmax) + ' °C</b>Máxima absoluta</div><div><b>' + n1(s.tmin) + ' °C</b>Mínima absoluta</div><div><b>' + s.hel + '</b>Días con helada (≤ ' + fmt1(cli.hel) + ' °C)</div><div><b>' + etTxt(s) + ' mm</b>ET acumulada</div><div><b>' + n1(s.mjDia) + '</b>MJ/m² por día, promedio</div><div><b>' + mjTxt(s, cal || s.dias) + '</b>MJ/m² acumulados</div>' + (s.estDias ? '<div class="cli-est"><b>' + s.estDias + '</b>Días estimados incluidos</div>' : '');
+    $('cliTot').innerHTML = '<div><b>' + n1(s.tmax) + ' °C</b>Máxima absoluta</div><div><b>' + n1(s.tmin) + ' °C</b>Mínima absoluta</div><div><b>' + s.hel + '</b>Días con helada (bajo 0 °C)</div><div><b>' + etTxt(s) + ' mm</b>ET acumulada</div><div><b>' + n1(s.mjDia) + '</b>MJ/m² por día, promedio</div><div><b>' + mjTxt(s, cal || s.dias) + '</b>MJ/m² acumulados</div>' + (s.estDias ? '<div class="cli-est"><b>' + s.estDias + '</b>Días estimados incluidos</div>' : '');
   };
   if (cli.vista === 'camp') {
     const lista = camps.slice().reverse().map(c => {
