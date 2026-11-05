@@ -2229,9 +2229,9 @@ function pintarRegLl() {
   }
   $('llTitulo').textContent = ll.pluv ? 'Lluvia en ' + ll.pluv : 'Elegí un pluviómetro';
   pintarMapaLl();
-  const ult = lluvias.slice().sort((a, b) => (b.fecha + (b.hora || '')).localeCompare(a.fecha + (a.hora || ''))).slice(0, 5);
+  const ult = lluvias.filter(r => r.campo === ll.campo).sort((a, b) => (b.fecha + (b.hora || '')).localeCompare(a.fecha + (a.hora || ''))).slice(0, 5);
   const pend = new Set(cola.map(r => r.id));
-  $('llUltimas').innerHTML = ult.length ? ult.map(r => fila(Object.assign({ tabla: 'lluvia' }, r), pend.has(r.id))).join('') : '<p class="vacio">Todavía no hay lecturas.</p>';
+  $('llUltimas').innerHTML = ult.length ? ult.map(r => fila(Object.assign({ tabla: 'lluvia' }, r), pend.has(r.id))).join('') : '<p class="vacio">Todavía no hay lecturas en este campo.</p>';
 }
 const guardarLluvia = unaVez(async () => {
   const p = pluvDe(ll.pluv);
