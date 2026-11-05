@@ -576,10 +576,11 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
           <div class="grid2" style="margin-top:12px">
             <div id="cliCampWrap"><label for="cliCamp">Campaña</label><select id="cliCamp" onchange="setCli('camp',this.value)"></select></div>
             <div id="cliMesWrap"><label for="cliMes">Mes</label><select id="cliMes" onchange="setCli('mes',this.value)"></select></div>
-            <div><label for="cliHel">Helada (°C)</label><input id="cliHel" inputmode="text" autocomplete="off" onchange="setCli('hel',this.value)"></div>
+            <div><label for="cliHel">Se considera helada con (°C o menos)</label><input id="cliHel" inputmode="text" autocomplete="off" onchange="setCli('hel',this.value)"></div>
           </div>
           <label class="cli-check"><input id="cliConEst" type="checkbox" onchange="setCli('conEst',this.checked)"> Incluir datos estimados</label>
         </section>
+        <h2 id="cliTotTit"></h2>
         <div id="cliTot" class="res-tot"></div>
         <section class="card" id="cliG1"></section>
         <section class="card" id="cliG2"></section>
@@ -599,7 +600,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       </div>
     </div>
     <button class="btn" style="width:100%" onclick="actualizarSolapaLl()">Actualizar</button>
-    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 G</p>
+    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 H</p>
   </div>
 
   <!-- REGISTROS -->
@@ -611,7 +612,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <p class="cfgdato" id="cfgUsuario"></p>
       <p class="cfgdato" id="cfgOffline"></p>
       <button class="btn" id="btnInstalar" style="width:100%" hidden onclick="instalarApp()">Instalar app</button>
-      <p class="cfgdato">Versión 05/11 G</p>
+      <p class="cfgdato">Versión 05/11 H</p>
       <button class="btn-link" onclick="abrirSetup()">Cambiar nombre o clave</button>
     </section>
   </div>
@@ -2662,16 +2663,18 @@ function pintarClima() {
   const meses = periodos(cli.camp, 'mes').filter(p => filas.some(r => r.f.slice(0, 7) === p.ini.slice(0, 7)));
   $('cliMesWrap').hidden = cli.vista !== 'dia';
   ['cliG1', 'cliG2', 'cliG3', 'cliTab'].forEach(id => { $(id).innerHTML = ''; });
-  const tot = (lista, cal) => {
+  const tot = (lista, cal, titulo) => {
     const s = resumenCli(lista);
-    $('cliTot').innerHTML = '<div><b>' + n1(s.tmax) + ' °C</b>Máxima</div><div><b>' + n1(s.tmin) + ' °C</b>Mínima</div><div><b>' + s.hel + '</b>Heladas (≤ ' + fmt1(cli.hel) + ' °C)</div><div><b>' + etTxt(s) + ' mm</b>Evapotranspiración</div><div><b>' + n1(s.mjDia) + '</b>MJ/m² por día (media)</div><div><b>' + mjTxt(s, cal || s.dias) + '</b>MJ/m² acumulados</div>' + (s.estDias ? '<div class="cli-est"><b>' + s.estDias + '</b>Días estimados incluidos</div>' : '');
+    $('cliTotTit').textContent = titulo;
+    $('cliTot').innerHTML = '<div><b>' + n1(s.tmax) + ' °C</b>Máxima absoluta</div><div><b>' + n1(s.tmin) + ' °C</b>Mínima absoluta</div><div><b>' + s.hel + '</b>Días con helada (≤ ' + fmt1(cli.hel) + ' °C)</div><div><b>' + etTxt(s) + ' mm</b>ET acumulada</div><div><b>' + n1(s.mjDia) + '</b>MJ/m² por día, promedio</div><div><b>' + mjTxt(s, cal || s.dias) + '</b>MJ/m² acumulados</div>' + (s.estDias ? '<div class="cli-est"><b>' + s.estDias + '</b>Días estimados incluidos</div>' : '');
   };
   if (cli.vista === 'camp') {
     const lista = camps.slice().reverse().map(c => {
       const x = baseCli().filter(r => campaniaDe(r.f) === c), fl = lluvias.filter(r => r.campania === c && r.campo === camposLl()[0]);
       return Object.assign({ c, pluv: fl.length ? Object.values(diario(fl)).reduce((a, b) => a + b, 0) : null }, resumenCli(x));
     });
-    tot(baseCli());
+    const b0 = baseCli();
+    tot(b0, undefined, 'Todo el período: ' + fechaDM(b0[0].f) + '/' + b0[0].f.slice(2, 4) + ' al ' + fechaDM(b0[b0.length - 1].f) + '/' + b0[b0.length - 1].f.slice(2, 4));
     const corto = c => c.slice(2, 4) + '-' + c.slice(5);
     grafBarras('cliG1', 'Heladas por campaña', lista.map(s => ({ et: corto(s.c), v: s.hel })), 'días');
     grafBarras('cliG2', 'Evapotranspiración por campaña', lista.map(s => ({ et: corto(s.c), v: s.et })), 'mm');
@@ -2680,7 +2683,7 @@ function pintarClima() {
       lista.map(s => '<tr><td>' + s.c + '</td><td>' + s.dias + '</td><td' + (s.estDias ? ' class="cli-est"' : '') + '>' + s.estDias + '</td><td>' + n1(s.tmax) + '</td><td>' + n1(s.tmin) + '</td><td>' + n1(s.tmed) + '</td><td>' + s.hel + '</td><td>' + n1(s.hum) + '</td><td>' + n1(s.viento) + '</td><td>' + n1(s.rad) + '</td><td>' + n1(s.mjDia) + '</td><td>' + mjTxt(s, 365) + '</td><td>' + etTxt(s) + '</td><td>' + n1(s.ll) + '</td><td>' + n1(s.pluv) + '</td></tr>'));
   } else if (cli.vista === 'mes') {
     const lista = meses.map(p => Object.assign({ et_: p.et, cal: diasMes(p.ini) }, resumenCli(filas.filter(r => r.f.slice(0, 7) === p.ini.slice(0, 7)))));
-    tot(filas, meses.reduce((a, p) => a + diasMes(p.ini), 0));
+    tot(filas, meses.reduce((a, p) => a + diasMes(p.ini), 0), 'Toda la campaña ' + cli.camp);
     grafTemp('cliG1', 'Temperatura por mes', lista.map(s => s.et_), lista.map(s => s.tmax), lista.map(s => s.tmed), lista.map(s => s.tmin));
     grafBarras('cliG2', 'Evapotranspiración por mes', lista.map(s => ({ et: s.et_, v: s.et })), 'mm');
     grafBarras('cliG3', 'Radiación acumulada por mes (MJ/m²)', lista.map(s => ({ et: s.et_, v: s.mj })), 'MJ/m²');
@@ -2690,7 +2693,7 @@ function pintarClima() {
     if (!meses.some(p => p.ini === cli.mes)) cli.mes = meses[meses.length - 1].ini;
     $('cliMes').innerHTML = meses.map(p => '<option value="' + p.ini + '">' + p.et + ' ' + p.ini.slice(0, 4) + '</option>').join(''); $('cliMes').value = cli.mes;
     const x = filas.filter(r => r.f.slice(0, 7) === cli.mes.slice(0, 7));
-    tot(x, diasMes(cli.mes));
+    tot(x, diasMes(cli.mes), 'Todo el mes de ' + (meses.find(p => p.ini === cli.mes) || {}).et + ' ' + cli.mes.slice(0, 4));
     grafTemp('cliG1', 'Temperatura por día', x.map(r => fechaDM(r.f)), x.map(r => r.tmax), x.map(r => r.tmed), x.map(r => r.tmin), x.map(r => r.est));
     grafBarras('cliG2', 'Evapotranspiración por día', x.map(r => ({ et: r.f.slice(8), v: r.et, tenue: r.etEst })), 'mm');
     grafBarras('cliG3', 'Radiación por día (MJ/m²/día)', x.map(r => ({ et: r.f.slice(8), v: r.rad == null ? null : r.rad * W_A_MJ, tenue: r.est })), 'MJ/m²/día');
