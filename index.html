@@ -206,6 +206,19 @@ body.sec-ll{--field:#155E75;--field-d:#0E4A5C;--tint:#E3F1F5;--tint2:#F4FAFB}
 .ll-tabla th:first-child,.ll-tabla td:first-child{text-align:left}
 .ll-tabla td .btn-link{min-height:36px;padding:0;font-size:17px}
 .ll-tabla tr.zona td{padding-top:12px;font-weight:700;background:var(--tint2)}
+.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+input[type=date],input[type=time]{min-width:0}
+.cli-tabla{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cli-tabla table{border-collapse:collapse;font-size:15px;white-space:nowrap}
+.cli-tabla th{padding:6px 8px;border-bottom:2px solid var(--ink);color:var(--mute);text-align:right;font-size:14px}
+.cli-tabla td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+.cli-tabla th:first-child,.cli-tabla td:first-child{position:sticky;left:0;background:#fff;text-align:left;font-weight:600}
+.cli-est,.cli-tabla tr.cli-est td,.cli-tabla td.cli-est{background:#FFF3D6!important}
+.res-tot .cli-est{border-color:var(--warn)}
+.cli-check{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--ink)}
+.cli-check input{width:24px;min-height:24px;height:24px}
+.cli-nota{margin:8px 2px;color:var(--mute);font-size:15px}
+#cliTot{margin-bottom:14px}
 body.sec-ot .btn-main{background:var(--ot);color:#fff}
 body.sec-ot .btn-main:active{background:var(--ot-d)}
 .fila.mon{--field:var(--mon);--field-d:#14402A;border-left:9px solid var(--mon)}
@@ -502,6 +515,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
     <div class="seg" id="segLl" style="margin-bottom:14px">
       <button data-v="reg" class="on" onclick="setVistaLl('reg')">Registrar</button>
       <button data-v="acu" onclick="setVistaLl('acu')">Acumulados</button>
+      <button data-v="cli" onclick="setVistaLl('cli')">Clima</button>
     </div>
     <div id="llReg">
       <p class="vacio" id="llSinDatos" hidden>Todavía no están cargados los pluviómetros. Abrí la app con señal.</p>
@@ -550,8 +564,42 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <section class="card" id="llHist"></section>
       <div id="llAcuDet"></div>
     </div>
-    <button class="btn" style="width:100%" onclick="refrescarLluvias(true)">Actualizar lluvias</button>
-    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 D</p>
+    <div id="llCli" hidden>
+      <p class="vacio" id="cliEstado"></p>
+      <div id="cliCont" hidden>
+        <section class="card">
+          <div class="seg chico" id="cliVista">
+            <button data-v="dia" onclick="setCli('vista','dia')">Día</button>
+            <button data-v="mes" onclick="setCli('vista','mes')">Mes</button>
+            <button data-v="camp" onclick="setCli('vista','camp')">Campaña</button>
+          </div>
+          <div class="grid2" style="margin-top:12px">
+            <div id="cliCampWrap"><label for="cliCamp">Campaña</label><select id="cliCamp" onchange="setCli('camp',this.value)"></select></div>
+            <div id="cliMesWrap"><label for="cliMes">Mes</label><select id="cliMes" onchange="setCli('mes',this.value)"></select></div>
+            <div><label for="cliHel">Helada (°C)</label><input id="cliHel" inputmode="text" autocomplete="off" onchange="setCli('hel',this.value)"></div>
+          </div>
+          <label class="cli-check"><input id="cliConEst" type="checkbox" onchange="setCli('conEst',this.checked)"> Incluir datos estimados</label>
+        </section>
+        <div id="cliTot" class="res-tot"></div>
+        <section class="card" id="cliG1"></section>
+        <section class="card" id="cliG2"></section>
+        <section class="card" id="cliG3"></section>
+        <section class="card" id="cliTab"></section>
+        <section class="card" id="cliGD">
+          <h2>Grados día</h2>
+          <div class="grid2">
+            <div><label for="cliTb">Temp. base (°C)</label><input id="cliTb" inputmode="decimal" autocomplete="off" onchange="setCli('tb',this.value)"></div>
+            <div></div>
+            <div><label for="cliIni">Desde</label><input id="cliIni" type="date" onchange="setCli('ini',this.value)"></div>
+            <div><label for="cliFin">Hasta</label><input id="cliFin" type="date" onchange="setCli('fin',this.value)"></div>
+          </div>
+          <div class="cli-gd-res" style="margin-top:12px"></div>
+        </section>
+        <p class="cli-nota" id="cliNota"></p>
+      </div>
+    </div>
+    <button class="btn" style="width:100%" onclick="actualizarSolapaLl()">Actualizar</button>
+    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 G</p>
   </div>
 
   <!-- REGISTROS -->
@@ -563,7 +611,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <p class="cfgdato" id="cfgUsuario"></p>
       <p class="cfgdato" id="cfgOffline"></p>
       <button class="btn" id="btnInstalar" style="width:100%" hidden onclick="instalarApp()">Instalar app</button>
-      <p class="cfgdato">Versión 05/11 D</p>
+      <p class="cfgdato">Versión 05/11 G</p>
       <button class="btn-link" onclick="abrirSetup()">Cambiar nombre o clave</button>
     </section>
   </div>
@@ -2161,6 +2209,7 @@ function setVistaLl(v) {
   document.querySelectorAll('#segLl button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('llReg').hidden = v !== 'reg';
   $('llAcu').hidden = v !== 'acu';
+  $('llCli').hidden = v !== 'cli';
   pintarLl();
   if (v === 'reg' && mapaLl) setTimeout(() => mapaLl.invalidateSize(), 0);
   window.scrollTo(0, 0);
@@ -2357,16 +2406,18 @@ function mensualDe(c, campo) {
 let X_MAX = 340;
 function svgLineas(series, etiquetas) {
   const H_ = 240, m = { t: 14, r: 14, b: 28, l: 38 }, n = etiquetas.length, w = X_MAX - m.l - m.r, h = H_ - m.t - m.b;
-  const max = Math.max(10, ...series.flatMap(s => s.v.filter(x => x != null)));
-  const paso = [10, 20, 50, 100, 200, 500].find(p => max / p <= 5) || 500, tope = Math.ceil(max / paso) * paso;
-  const X = i => m.l + (n > 1 ? i * w / (n - 1) : 0), Y = v => m.t + h - v / tope * h;
+  const vals = series.flatMap(s => s.v.filter(x => x != null)), max = Math.max(10, ...vals), min = Math.min(0, ...vals);
+  const paso = [5, 10, 20, 50, 100, 200, 500, 1000].find(p => (max - min) / p <= 5) || 1000;
+  const tope = Math.ceil(max / paso) * paso, base = Math.floor(min / paso) * paso;
+  const X = i => m.l + (n > 1 ? i * w / (n - 1) : 0), Y = v => m.t + h - (v - base) / (tope - base) * h;
   let g = '';
-  for (let v = 0; v <= tope; v += paso) g += '<line class="grid" x1="' + m.l + '" x2="' + (X_MAX - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text class="ax" x="' + (m.l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '</text>';
+  for (let v = base; v <= tope; v += paso) g += '<line class="grid" x1="' + m.l + '" x2="' + (X_MAX - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text class="ax" x="' + (m.l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '</text>';
   const cada = Math.max(1, Math.ceil(n * 62 / w));
   etiquetas.forEach((e, i) => { if (i % cada === 0) g += '<text class="ax" x="' + X(i) + '" y="' + (H_ - 8) + '" text-anchor="' + (i === 0 ? 'start' : 'middle') + '">' + esc(e) + '</text>'; });
   series.forEach(s => {
     const pts = s.v.map((v, i) => v == null ? null : X(i).toFixed(1) + ',' + Y(v).toFixed(1)).filter(Boolean);
     g += '<polyline fill="none" stroke="' + s.color + '" stroke-width="' + (s.ref ? 2 : 3) + '" stroke-linejoin="round" stroke-linecap="round"' + (s.ref ? ' stroke-dasharray="6 5"' : '') + ' points="' + pts.join(' ') + '"/>';
+    if (s.est) s.v.forEach((v, i) => { if (s.est[i] && v != null) g += '<circle cx="' + X(i) + '" cy="' + Y(v) + '" r="3.5" fill="#fff" stroke="' + s.color + '" stroke-width="2"/>'; });
     const k = s.v.map(v => v != null).lastIndexOf(true);
     if (!s.ref && k >= 0) g += '<circle cx="' + X(k) + '" cy="' + Y(s.v[k]) + '" r="5" fill="' + s.color + '" stroke="#fff" stroke-width="2"/>';
   });
@@ -2510,7 +2561,144 @@ function pintarAcuLl() {
   }
 }
 function pintarLl() {
-  if (ll.vista === 'reg') pintarRegLl(); else pintarAcuLl();
+  if (ll.vista === 'reg') pintarRegLl();
+  else if (ll.vista === 'acu') pintarAcuLl();
+  else { pintarClima(); cargarClima(); }
+}
+function actualizarSolapaLl() { if (ll.vista === 'cli') cargarClima(true); else refrescarLluvias(true); }
+
+/* ---------- clima: reportes de la estación, se bajan solo al entrar ---------- */
+let clima = null, climaFecha = 0, climaBajando = false;
+let cli = Object.assign({ vista: 'mes', camp: '', mes: '', tb: 10, ini: '', fin: '', hel: 0, conEst: true }, lee('mc_cli', {}));
+const baseCli = () => cli.conEst ? clima : clima.filter(r => !r.est);
+const COL_MAX = '#C2571A', COL_MIN = '#0E7490', COL_REF = '#5F6B65';
+const n1 = v => v == null || v === '' ? '-' : fmt1(v);
+function guardarCli() { escribe('mc_cli', { vista: cli.vista, tb: cli.tb, hel: cli.hel, conEst: cli.conEst }); }
+function expandirClima(filas) {
+  const v = x => x === '' || x == null ? null : Number(x);
+  return filas.map(r => ({ f: r[0], tmax: v(r[1]), tmin: v(r[2]), tmed: v(r[3]), hum: v(r[4]), viento: v(r[5]), vmax: v(r[6]), rad: v(r[7]), ll: v(r[8]), et: v(r[9]), inc: r[10] === 1, est: r[10] === 2, etEst: !!r[11] }));
+}
+async function cargarClima(manual) {
+  if (!clima) {
+    try { const g = await dbGet('clima'); if (g) { clima = expandirClima(g.filas); climaFecha = g.t; } } catch (e) { /* sin guardado */ }
+    if (clima) pintarClima();
+  }
+  if (climaBajando) return;
+  if (!manual && clima && Date.now() - climaFecha < 21600000) return;
+  if (!equipo || !apiLista() || !navigator.onLine) { if (manual || !clima) toast('Sin señal. Abrí Clima una vez con señal.', true); if (!clima) pintarClima(); return; }
+  climaBajando = true;
+  if (!clima) $('cliEstado').textContent = 'Bajando los datos de la estación…';
+  try {
+    const filas = (await api('clima')) || [];
+    clima = expandirClima(filas); climaFecha = Date.now();
+    dbSet('clima', { filas, t: climaFecha }).catch(() => {});
+    if (manual) toast('Clima actualizado');
+  } catch (e) {
+    if (!claveRechazada(e)) toast('No se pudo bajar el clima: ' + e.message, true);
+  }
+  climaBajando = false;
+  pintarClima();
+}
+function setCli(k, v) {
+  cli[k] = v;
+  if (k === 'conEst') cli.conEst = !!v;
+  if (k === 'tb' || k === 'hel') cli[k] = num(v);
+  if (k === 'camp') { cli.ini = ''; cli.fin = ''; }
+  guardarCli(); pintarClima();
+}
+function resumenCli(filas) {
+  const con = k => filas.filter(r => r[k] != null), prom = k => { const x = con(k); return x.length ? x.reduce((a, r) => a + r[k], 0) / x.length : null; };
+  const suma = k => { const x = con(k); return x.length ? x.reduce((a, r) => a + r[k], 0) : null; };
+  return { dias: filas.length, tmax: con('tmax').length ? Math.max(...con('tmax').map(r => r.tmax)) : null, tmin: con('tmin').length ? Math.min(...con('tmin').map(r => r.tmin)) : null,
+    tmed: prom('tmed'), hum: prom('hum'), viento: prom('viento'), rad: prom('rad'), ll: suma('ll'), et: suma('et'), etDias: con('et').length, mj: suma('rad') == null ? null : suma('rad') * W_A_MJ, mjDia: prom('rad') == null ? null : prom('rad') * W_A_MJ, radDias: con('rad').length, estDias: filas.filter(r => r.est).length, hel: filas.filter(r => r.tmin != null && r.tmin <= cli.hel).length };
+}
+const W_A_MJ = 0.0864;
+const mjTxt = (s, cal) => s.mj == null ? '-' : fmt0(s.mj) + (s.radDias < cal ? '*' : '');
+const diasMes = ini => new Date(Date.UTC(Number(ini.slice(0, 4)), Number(ini.slice(5, 7)), 0)).getUTCDate();
+const etTxt = s => s.et == null ? '-' : fmt1(s.et) + (s.etDias < s.dias ? '*' : '');
+function tablaCli(cab, filas) {
+  return '<div class="cli-tabla"><table><thead><tr>' + cab.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' + filas.join('') + '</tbody></table></div>';
+}
+function grafTemp(id, titulo, et, maxs, meds, mins, marcas) {
+  const series = [{ nombre: 'Máxima', v: maxs, color: COL_MAX, est: marcas }, { nombre: 'Media', v: meds, color: COL_REF, ref: true }, { nombre: 'Mínima', v: mins, color: COL_MIN, est: marcas }];
+  const g = svgLineas(series, et);
+  $(id).innerHTML = '<h2>' + titulo + '</h2><div class="ll-leyenda">' + series.map(x => '<span><i style="border-top:3px ' + (x.ref ? 'dashed' : 'solid') + ' ' + x.color + '"></i>' + x.nombre + '</span>').join('') + '</div><div class="ll-graf">' + g.svg + '<div class="ll-tooltip" hidden></div></div>' + (marcas && marcas.some(Boolean) ? '<p class="cli-nota">Puntos con borde: días estimados.</p>' : '');
+  tocarGrafico($(id), g.X, g.n, i => maxs[i] == null ? '' : '<b>' + esc(et[i]) + (marcas && marcas[i] ? ' (estimado)' : '') + '</b>' + series.map(x => '<div>' + x.nombre + ': ' + n1(x.v[i]) + ' °C</div>').join(''));
+}
+function grafBarras(id, titulo, filas, unidad, extra) {
+  const g = svgBarras(filas);
+  $(id).innerHTML = '<h2>' + titulo + '</h2><div class="ll-graf">' + g.svg + '<div class="ll-tooltip" hidden></div></div>' + (extra || '');
+  tocarGrafico($(id), g.X, g.n, i => filas[i].v == null ? '' : '<b>' + esc(filas[i].et) + '</b><div>' + n1(filas[i].v) + ' ' + unidad + '</div>');
+}
+function pintarGD() {
+  const u = clima[clima.length - 1].f;
+  const a = inicioCamp(cli.camp), ini = cli.ini || ymd(a, 10, 1), fin = cli.fin || (u < ymd(a + 1, 5, 31) ? u : ymd(a + 1, 5, 31));
+  const rango = baseCli().filter(r => r.f >= ini && r.f <= fin), usa = rango.filter(r => !r.inc && r.tmax != null && r.tmin != null);
+  let ac = 0, tb = cli.tb;
+  const pts = usa.map(r => { ac += Math.max(0, (r.tmax + r.tmin) / 2 - tb); return { f: r.f, ac }; });
+  const total = Math.round((new Date(fin + 'T12:00:00Z') - new Date(ini + 'T12:00:00Z')) / 864e5) + 1, faltan = Math.max(0, total - usa.length);
+  const paso = Math.max(1, Math.ceil(pts.length / 120)), vis = pts.filter((_, i) => i % paso === 0 || i === pts.length - 1);
+  const s = [{ nombre: 'Grados día', v: vis.map(p => p.ac), color: COL_MIN }];
+  const g = pts.length ? svgLineas(s, vis.map(p => fechaDM(p.f))) : null;
+  $('cliGD').querySelector('.cli-gd-res').innerHTML = pts.length ? '<div class="res-tot"><div><b>' + fmt0(ac) + ' GD</b>Acumulados</div><div><b>' + usa.length + '</b>Días usados de ' + total + '</div></div>' + (usa.some(r => r.est) ? '<p class="cli-nota">Incluye ' + usa.filter(r => r.est).length + ' días estimados.</p>' : '') +
+    (faltan ? '<p class="cli-nota">Faltan ' + faltan + ' días sin datos o incompletos: el acumulado real es algo mayor.</p>' : '') + '<div class="ll-graf">' + g.svg + '<div class="ll-tooltip" hidden></div></div>' : '<p class="vacio">No hay datos en esas fechas.</p>';
+  if (g) tocarGrafico($('cliGD'), g.X, g.n, i => '<b>' + fechaDM(vis[i].f) + '</b><div>' + fmt0(vis[i].ac) + ' GD</div>');
+  $('cliIni').value = ini; $('cliFin').value = fin;
+}
+function pintarClima() {
+  const hay = clima && clima.length;
+  $('cliCont').hidden = !hay;
+  if (!hay) { if (!climaBajando) $('cliEstado').textContent = 'Todavía no hay datos de la estación.'; return; }
+  $('cliEstado').textContent = '';
+  X_MAX = Math.max(280, $('cliTot').clientWidth - 32);
+  const camps = [...new Set(clima.map(r => campaniaDe(r.f)))].sort().reverse();
+  if (!camps.includes(cli.camp)) cli.camp = camps[0];
+  $('cliCamp').innerHTML = camps.map(c => '<option>' + c + '</option>').join(''); $('cliCamp').value = cli.camp;
+  $('cliHel').value = cli.hel; $('cliTb').value = cli.tb;
+  document.querySelectorAll('#cliVista button').forEach(b => b.classList.toggle('on', b.dataset.v === cli.vista));
+  $('cliCampWrap').hidden = cli.vista === 'camp';
+  $('cliConEst').checked = cli.conEst;
+  const filas = baseCli().filter(r => campaniaDe(r.f) === cli.camp);
+  const meses = periodos(cli.camp, 'mes').filter(p => filas.some(r => r.f.slice(0, 7) === p.ini.slice(0, 7)));
+  $('cliMesWrap').hidden = cli.vista !== 'dia';
+  ['cliG1', 'cliG2', 'cliG3', 'cliTab'].forEach(id => { $(id).innerHTML = ''; });
+  const tot = (lista, cal) => {
+    const s = resumenCli(lista);
+    $('cliTot').innerHTML = '<div><b>' + n1(s.tmax) + ' °C</b>Máxima</div><div><b>' + n1(s.tmin) + ' °C</b>Mínima</div><div><b>' + s.hel + '</b>Heladas (≤ ' + fmt1(cli.hel) + ' °C)</div><div><b>' + etTxt(s) + ' mm</b>Evapotranspiración</div><div><b>' + n1(s.mjDia) + '</b>MJ/m² por día (media)</div><div><b>' + mjTxt(s, cal || s.dias) + '</b>MJ/m² acumulados</div>' + (s.estDias ? '<div class="cli-est"><b>' + s.estDias + '</b>Días estimados incluidos</div>' : '');
+  };
+  if (cli.vista === 'camp') {
+    const lista = camps.slice().reverse().map(c => {
+      const x = baseCli().filter(r => campaniaDe(r.f) === c), fl = lluvias.filter(r => r.campania === c && r.campo === camposLl()[0]);
+      return Object.assign({ c, pluv: fl.length ? Object.values(diario(fl)).reduce((a, b) => a + b, 0) : null }, resumenCli(x));
+    });
+    tot(baseCli());
+    const corto = c => c.slice(2, 4) + '-' + c.slice(5);
+    grafBarras('cliG1', 'Heladas por campaña', lista.map(s => ({ et: corto(s.c), v: s.hel })), 'días');
+    grafBarras('cliG2', 'Evapotranspiración por campaña', lista.map(s => ({ et: corto(s.c), v: s.et })), 'mm');
+    grafBarras('cliG3', 'Radiación acumulada por campaña (MJ/m²)', lista.map(s => ({ et: corto(s.c), v: s.mj })), 'MJ/m²');
+    $('cliTab').innerHTML = '<h2>Resumen por campaña</h2>' + tablaCli(['Campaña', 'Días', 'Est.', 'Máx', 'Mín', 'Media', 'Hel.', 'Hum %', 'Viento', 'Rad W/m²', 'MJ/m²/d', 'MJ acum.', 'ET', 'Lluvia est.', 'Pluviómetros'],
+      lista.map(s => '<tr><td>' + s.c + '</td><td>' + s.dias + '</td><td' + (s.estDias ? ' class="cli-est"' : '') + '>' + s.estDias + '</td><td>' + n1(s.tmax) + '</td><td>' + n1(s.tmin) + '</td><td>' + n1(s.tmed) + '</td><td>' + s.hel + '</td><td>' + n1(s.hum) + '</td><td>' + n1(s.viento) + '</td><td>' + n1(s.rad) + '</td><td>' + n1(s.mjDia) + '</td><td>' + mjTxt(s, 365) + '</td><td>' + etTxt(s) + '</td><td>' + n1(s.ll) + '</td><td>' + n1(s.pluv) + '</td></tr>'));
+  } else if (cli.vista === 'mes') {
+    const lista = meses.map(p => Object.assign({ et_: p.et, cal: diasMes(p.ini) }, resumenCli(filas.filter(r => r.f.slice(0, 7) === p.ini.slice(0, 7)))));
+    tot(filas, meses.reduce((a, p) => a + diasMes(p.ini), 0));
+    grafTemp('cliG1', 'Temperatura por mes', lista.map(s => s.et_), lista.map(s => s.tmax), lista.map(s => s.tmed), lista.map(s => s.tmin));
+    grafBarras('cliG2', 'Evapotranspiración por mes', lista.map(s => ({ et: s.et_, v: s.et })), 'mm');
+    grafBarras('cliG3', 'Radiación acumulada por mes (MJ/m²)', lista.map(s => ({ et: s.et_, v: s.mj })), 'MJ/m²');
+    $('cliTab').innerHTML = '<h2>Resumen por mes</h2>' + tablaCli(['Mes', 'Días', 'Est.', 'Máx', 'Mín', 'Media', 'Hel.', 'Hum %', 'Viento', 'Rad W/m²', 'MJ/m²/d', 'MJ acum.', 'ET', 'Lluvia est.'],
+      lista.map(s => '<tr><td>' + s.et_ + '</td><td>' + s.dias + '</td><td' + (s.estDias ? ' class="cli-est"' : '') + '>' + s.estDias + '</td><td>' + n1(s.tmax) + '</td><td>' + n1(s.tmin) + '</td><td>' + n1(s.tmed) + '</td><td>' + s.hel + '</td><td>' + n1(s.hum) + '</td><td>' + n1(s.viento) + '</td><td>' + n1(s.rad) + '</td><td>' + n1(s.mjDia) + '</td><td>' + mjTxt(s, s.cal) + '</td><td>' + etTxt(s) + '</td><td>' + n1(s.ll) + '</td></tr>'));
+  } else {
+    if (!meses.some(p => p.ini === cli.mes)) cli.mes = meses[meses.length - 1].ini;
+    $('cliMes').innerHTML = meses.map(p => '<option value="' + p.ini + '">' + p.et + ' ' + p.ini.slice(0, 4) + '</option>').join(''); $('cliMes').value = cli.mes;
+    const x = filas.filter(r => r.f.slice(0, 7) === cli.mes.slice(0, 7));
+    tot(x, diasMes(cli.mes));
+    grafTemp('cliG1', 'Temperatura por día', x.map(r => fechaDM(r.f)), x.map(r => r.tmax), x.map(r => r.tmed), x.map(r => r.tmin), x.map(r => r.est));
+    grafBarras('cliG2', 'Evapotranspiración por día', x.map(r => ({ et: r.f.slice(8), v: r.et, tenue: r.etEst })), 'mm');
+    grafBarras('cliG3', 'Radiación por día (MJ/m²/día)', x.map(r => ({ et: r.f.slice(8), v: r.rad == null ? null : r.rad * W_A_MJ, tenue: r.est })), 'MJ/m²/día');
+    $('cliTab').innerHTML = '<h2>Detalle por día</h2>' + tablaCli(['Día', 'Máx', 'Mín', 'Media', 'Hum %', 'Viento', 'Vto. máx', 'Rad W/m²', 'MJ/m²/d', 'MJ acum.', 'ET', 'Lluvia est.'],
+      x.map((r, i) => '<tr' + (r.est ? ' class="cli-est"' : '') + '><td>' + fechaDM(r.f) + (r.inc ? '*' : '') + (r.est ? ' e' : '') + '</td><td>' + n1(r.tmax) + '</td><td>' + n1(r.tmin) + '</td><td>' + n1(r.tmed) + '</td><td>' + n1(r.hum) + '</td><td>' + n1(r.viento) + '</td><td>' + n1(r.vmax) + '</td><td>' + n1(r.rad) + '</td><td>' + (r.rad == null ? '-' : n1(r.rad * W_A_MJ)) + '</td><td>' + fmt0(x.slice(0, i + 1).reduce((a, y) => a + (y.rad || 0), 0) * W_A_MJ) + '</td><td' + (r.etEst ? ' class="cli-est"' : '') + '>' + n1(r.et) + '</td><td>' + n1(r.ll) + '</td></tr>'));
+  }
+  pintarGD();
+  $('cliNota').textContent = 'Datos hasta ' + fechaCorta(clima[clima.length - 1].f) + '. MJ/m² = radiación media del día × 0,0864. En amarillo o con «e»: dato estimado con NASA POWER ajustada a la estación, o ET calculada con FAO-56. El asterisco marca días con pocas lecturas o períodos con datos faltantes. La lluvia de la estación es solo de referencia.';
 }
 
 function pintarSeccion() {
