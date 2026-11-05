@@ -551,7 +551,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <div id="llAcuDet"></div>
     </div>
     <button class="btn" style="width:100%" onclick="refrescarLluvias(true)">Actualizar lluvias</button>
-    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 B</p>
+    <p class="cfgdato" style="text-align:center;margin-top:10px">Versión 05/11 D</p>
   </div>
 
   <!-- REGISTROS -->
@@ -563,7 +563,7 @@ body.sec-ot .btn-main:active{background:var(--ot-d)}
       <p class="cfgdato" id="cfgUsuario"></p>
       <p class="cfgdato" id="cfgOffline"></p>
       <button class="btn" id="btnInstalar" style="width:100%" hidden onclick="instalarApp()">Instalar app</button>
-      <p class="cfgdato">Versión 05/11 B</p>
+      <p class="cfgdato">Versión 05/11 D</p>
       <button class="btn-link" onclick="abrirSetup()">Cambiar nombre o clave</button>
     </section>
   </div>
@@ -2489,14 +2489,17 @@ function pintarAcuLl() {
   $('llPluv').hidden = soloHist;
   $('llPluv').innerHTML = '<h2>Por pluviómetro</h2><div class="ll-tabla"><table><thead><tr><th>Pluviómetro</th><th>mm</th></tr></thead><tbody>' +
     grupos.map(z => (z ? filaZona(z) : '') + delCampo.filter(p => (p.zona || '') === z).map(p =>
-      '<tr><td><button class="btn-link" data-v="p:' + esc(p.nombre) + '" onclick="setFiltroLl(\'ver\',this.dataset.v)">' + esc(p.nombre) + '</button></td><td>' + fmt1(totP[p.nombre] || 0) + '</td></tr>').join('')).join('') +
+      '<tr><td><button class="btn-link" data-v="p:' + esc(p.nombre) + '" onclick="setFiltroLl(\'ver\',this.dataset.v)">' + esc(p.nombre) + '</button></td><td>' + (totP[p.nombre] === undefined ? 'Sin datos' : fmt1(totP[p.nombre])) + '</td></tr>').join('')).join('') +
     '</tbody></table></div>';
 
   /* historia de campañas */
   const cH = [...new Set(histLl.filter(r => r.campo === llf.campo).map(r => r.campania))].sort();
   $('llHist').hidden = !cH.length;
   if (cH.length) {
-    const lista = cH.map(c => ({ c, v: histDe(c, llf.campo).reduce((a, r) => a + r.mm, 0) }));
+    const lista = cH.map(c => {
+      const fl = lluvias.filter(r => r.campania === c && r.campo === llf.campo);
+      return { c, v: fl.length ? Object.values(diario(fl)).reduce((a, b) => a + b, 0) : histDe(c, llf.campo).reduce((a, r) => a + r.mm, 0) };
+    });
     const act = campaniaDe(hoyTxt());
     if (!cH.includes(act)) lista.push({ c: act, v: Object.values(diario(lluvias.filter(r => r.campania === act && r.campo === llf.campo))).reduce((a, b) => a + b, 0), curso: true });
     const corto = c => c.slice(2, 4) + '-' + c.slice(5);
